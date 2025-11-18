@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+{% block content %}
+<h2>Welcome, Admin {{ current_user.username }}</h2>
+<ul>
+  <li><a href="{{ url_for('views.event_registration') }}">Event Registration</a></li>
+  <li><a href="{{ url_for('views.round_control') }}">Round Control</a></li>
+  <li><a href="{{ url_for('views.tie_breaker') }}">Tie Breaker</a></li>
+  <li><a href="{{ url_for('views.final_results') }}">Final Results</a></li>
+</ul>
+{% endblock %}

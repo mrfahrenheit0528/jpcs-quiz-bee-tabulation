@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Round Configuration{% endblock %}
+
+{% block content %}
+<div class="container">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>Setup Rounds</h2>
+            <h5 class="text-muted">Event: <strong>{{ event.name }}</strong></h5>
+        </div>
+        <a href="{{ url_for('views.event_registration') }}" class="btn btn-outline-secondary">
+            &larr; Back to Events List
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card shadow-sm border-primary">
+                <div class="card-header bg-primary text-white">
+                    <i class="fas fa-plus-circle"></i> Add New Round
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Order #</label>
+                            <input type="number" name="round_number" class="form-control" placeholder="e.g. 1" required>
+                            <div class="form-text">1=First round, 2=Second...</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Round Name/Difficulty</label>
+                            <input type="text" name="difficulty" class="form-control" list="difficultyOptions" placeholder="Type or select..." required>
+                            <datalist id="difficultyOptions">
+                                <option value="Easy">
+                                <option value="Average">
+                                <option value="Difficult">
+                                <option value="Clincher">
+                            </datalist>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Points per Question</label>
+                            <div class="input-group">
+                                <span class="input-group-text">Pts</span>
+                                <input type="number" name="points" class="form-control" placeholder="e.g. 5" required>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Total Questions</label>
+                            <div class="input-group">
+                                <span class="input-group-text">Qty</span>
+                                <input type="number" name="total_questions" class="form-control" placeholder="e.g. 10" required>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">  
+                            <label class="form-label fw-bold">Qualifiers (Advancing to Next)</label>
+                            <input type="number" name="qualifying_count" class="form-control" placeholder="e.g. 10 (Enter 0 if all advance)">
+                            <div class="form-text">How many top schools move to the next round?</div>
+                        </div>
+
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="is_final" name="is_final">
+                            <label class="form-check-label fw-bold" for="is_final">Is this the Final Round?</label>
+                            <div class="form-text text-danger">If checked, winners will be declared instead of moving to a next round.</div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100">Save Round</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    Current Rounds Configuration
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="text-center">#</th>
+                                <th>Round Name</th>
+                                <th class="text-center">Points</th>
+                                <th class="text-center">Questions</th>
+                                <th class="text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for round in rounds %}
+                            <tr>
+                                <td class="text-center fw-bold">{{ round.number }}</td>
+                                <td>{{ round.difficulty }}</td>
+                                <td class="text-center"><span class="badge bg-info text-dark">{{ round.points }} pts</span></td>
+                                <td class="text-center">{{ round.total_questions }} items</td>
+                                <td class="text-center">
+                                    <form method="POST" action="{{ url_for('views.delete_round', round_id=round.id) }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this round?')">
+                                            Delete
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-5">
+                                    <em>No rounds created yet.<br>Use the form on the left to add one.</em>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

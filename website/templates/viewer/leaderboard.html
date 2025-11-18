@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Leaderboard{% endblock %}
+
+{% block content %}
+<div class="text-center">
+    <h2 class="mt-4">Quiz Bee Leaderboard</h2>
+
+    {% if not event %}
+        <p class="lead text-muted">There is no event at the moment.</p>
+    {% else %}
+        <p class="lead">Current Event: <strong>{{ event.name }}</strong></p>
+
+        {% if schools %}
+            <table class="table table-striped mt-4">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Rank</th>
+                        <th>School</th>
+                        <th>Total Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for school in schools %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td>{{ school.name }}</td>
+                            <td>{{ school.scores | map(attribute='points') | sum }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="text-muted">No schools registered yet for this event.</p>
+        {% endif %}
+    {% endif %}
+</div>
+{% endblock %}

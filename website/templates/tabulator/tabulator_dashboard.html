@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Tabulator Dashboard{% endblock %}
+{% block content %}
+
+    <h2>Welcome, Tabulator {{ current_user.username }}</h2>
+    <p class="lead">Assigned School: <strong>{{ school.name if school else "None" }}</strong></p>
+    <hr>
+
+    {% if not active_event %}
+        <div class="alert alert-warning" role="alert">
+            No active Quiz Bee Event has been set by the Admin yet.
+        </div>
+    {% elif not school %}
+         <div class="alert alert-danger" role="alert">
+            You are not assigned to a school for the active event ({{ active_event.name }}). Please contact the Admin.
+        </div>
+    {% elif not rounds %}
+        <div class="alert alert-info" role="alert">
+            Event **{{ active_event.name }}** is active, but no rounds have been created yet.
+        </div>
+    {% else %}
+        
+        <h3>Current Event: {{ active_event.name }}</h3>
+        <p>Select the round you need to score for **{{ school.name }}**:</p>
+
+        <div class="list-group">
+            {% for round in rounds %}
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>{{ round.difficulty }}</strong>
+                        </div>
+
+                    <div>
+                        {% if round.is_active %}
+                            
+                            {% if round.is_school_allowed(school.id) %}
+                                <a href="{{ url_for('views.scoring', round_id=round.id) }}" 
+                                class="btn btn-success fw-bold animate-pulse">
+                                ENTER SCORING ▶
+                                </a>
+                            {% else %}
+                                <button class="btn btn-secondary btn-sm" disabled>
+                                    Not Participating 🚫
+                                </button>
+                            {% endif %}
+
+                        {% else %}
+                            <button class="btn btn-outline-secondary btn-sm" disabled>
+                                Waiting for Admin...
+                            </button>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+        
+    {% endif %}
+
+{% endblock %}

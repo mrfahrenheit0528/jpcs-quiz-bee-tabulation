@@ -1,2 +1,23 @@
 {% extends "base.html" %}
-<title>{% block title %}Home{% endblock %}</title>
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<div class="text-center">
+    <h1 class="mt-4">Welcome to the Quiz Bee Tabulation System</h1>
+    <p class="lead">Manage events, track scores, and view results all in one place.</p>
+
+    <div class="mt-4">
+        {% if current_user.is_authenticated %}
+            <p>You are logged in as <strong>{{ current_user.username }}</strong> ({{ current_user.role }}).</p>
+            {% if current_user.role == 'admin' %}
+                <a href="{{ url_for('views.admin_dashboard') }}" class="btn btn-primary">Go to Admin Dashboard</a>
+            {% elif current_user.role == 'tabulator' %}
+                <a href="{{ url_for('views.tabulator_dashboard') }}" class="btn btn-primary">Go to Tabulator Dashboard</a>
+            {% endif %}
+        {% else %}
+            <a href="{{ url_for('auth.login') }}" class="btn btn-success">Login</a>
+            <a href="{{ url_for('views.leaderboard') }}" class="btn btn-info">View Leaderboard</a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
