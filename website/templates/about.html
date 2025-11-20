@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}About - JPCS{% endblock %}
+
+{% block content %}
+<style>
+    .about-header {
+        background: linear-gradient(135deg, var(--jpcs-maroon) 0%, #2C0404 100%);
+        color: white;
+        padding: 60px 0;
+        margin-bottom: 40px;
+        border-bottom: 5px solid var(--jpcs-orange);
+    }
+    .feature-icon-circle {
+        width: 60px;
+        height: 60px;
+        background-color: var(--jpcs-light);
+        color: var(--jpcs-maroon);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        margin: 0 auto 15px;
+        transition: all 0.3s;
+    }
+    .card:hover .feature-icon-circle {
+        background-color: var(--jpcs-orange);
+        color: white;
+    }
+</style>
+
+<!-- Header Section -->
+<div class="about-header text-center">
+    <div class="container">
+        <h1 class="fw-bold display-5 mb-3">About the System</h1>
+        <p class="lead text-white-50 mx-auto" style="max-width: 700px;">
+            A state-of-the-art automated tabulation solution developed by the 
+            Junior Philippine Computer Society - CSPC Chapter.
+        </p>
+    </div>
+</div>
+
+<div class="container mb-5">
+    
+    <!-- Project Context -->
+    <div class="row align-items-center mb-5">
+        <div class="col-md-6">
+            <h6 class="text-uppercase fw-bold" style="color: var(--jpcs-orange);">The Mission</h6>
+            <h2 class="fw-bold mb-4" style="color: var(--jpcs-maroon);">Precision & Efficiency</h2>
+            <p class="text-muted lead">
+                The <strong>Quiz Bee Tabulation System</strong> was architected to eliminate manual computation errors and provide real-time, transparent results for academic competitions.
+            </p>
+            <p class="text-muted">
+                Built with advanced algorithms to handle <strong>Hybrid Scoring</strong> (Cumulative + Clean Slate Final) and <strong>Iterative Tie-Breaking</strong>, this system ensures that every winner is determined fairly and accurately.
+            </p>
+        </div>
+        <div class="col-md-6 text-center">
+            <img src="{{ url_for('static', filename='JPCS2024_Group.png') }}" alt="Innovation" class="img-fluid rounded-4 shadow">
+        </div>
+    </div>
+
+    <!-- Features Grid -->
+    <div class="row g-4 mb-5 text-center">
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm p-4 border-0">
+                <div class="feature-icon-circle">
+                    <i class="fas fa-calculator"></i>
+                </div>
+                <h5 class="fw-bold">Hybrid Scoring</h5>
+                <p class="small text-muted">Seamlessly switches between cumulative points for elimination rounds and back-to-zero scoring for the finals.</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm p-4 border-0">
+                <div class="feature-icon-circle">
+                    <i class="fas fa-balance-scale"></i>
+                </div>
+                <h5 class="fw-bold">Smart Tie-Breaker</h5>
+                <p class="small text-muted">Automatically detects ties at qualifying cutoffs and generates sudden-death clincher rounds instantly.</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm p-4 border-0">
+                <div class="feature-icon-circle">
+                    <i class="fas fa-file-contract"></i>
+                </div>
+                <h5 class="fw-bold">Official Reports</h5>
+                <p class="small text-muted">Generates signed, secured, and formatted PDF result sheets ready for printing and archiving.</p>
+            </div>
+        </div>
+    </div>
+
+    <hr class="my-5">
+
+    <!-- Organization / Developers -->
+    <div class="text-center mb-5">
+        <h6 class="text-uppercase fw-bold text-muted mb-3">Powered By</h6>
+        <h3 class="fw-bold mb-2">JPCS - CSPC Chapter</h3>
+        <p class="small fst-italic text-muted mb-4">Created by Elmo Angelo Hermoso - Director for Projects 2025</p>
+        
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card bg-light border-0">
+                    <div class="card-body p-4">
+                        <p class="fst-italic text-muted mb-0">
+                            "Excellence in Technology, Leadership in Action."
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="text-center">
+        <a href="{{ url_for('views.home') }}" class="btn btn-outline-secondary">
+            &larr; Back to Home
+        </a>
+    </div>
+
+</div>
+{% endblock %}

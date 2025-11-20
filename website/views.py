@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify, make_response
+from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify, make_response, current_app
 from flask_login import login_required, current_user
 from .models import User, Event, School, Round, Score
 from . import db
@@ -6,10 +6,10 @@ from sqlalchemy import func
 from werkzeug.security import generate_password_hash
 from fpdf import FPDF
 from itertools import groupby 
+import os
 
 views = Blueprint('views', __name__)
 
-# --- HELPER FOR ORDINAL NUMBERS ---
 def to_ordinal(n):
     if 11 <= (n % 100) <= 13:
         suffix = 'th'
@@ -17,10 +17,6 @@ def to_ordinal(n):
         suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')
     return f"{n}{suffix}"
 
-# ... (Keep set_active_event, home, leaderboard, admin dashboard, user, event, school, round routes UNCHANGED) ...
-# ... (Only showing updated download_results_pdf below) ...
-
-# --- HELPER ---
 def set_active_event(event_id):
     Event.query.update({Event.is_active: False})
     event = Event.query.get(event_id)
@@ -33,6 +29,10 @@ def set_active_event(event_id):
 @views.route('/')
 def home():
     return render_template("home.html")
+
+@views.route('/about')
+def about():
+    return render_template("about.html")
 
 # --- VIEWER LEADERBOARD (FIXED SORTING) ---
 @views.route('/leaderboard')
@@ -815,14 +815,9 @@ def download_results_pdf(event_id):
     
     # --- 1. IDENTIFY ROUNDS & COLUMNS ---
     all_rounds = Round.query.filter_by(event_id=event.id).order_by(Round.number.asc()).all()
-    
-    # A. Cumulative Rounds (Non-Final, Non-TieBreaker)
     cumulative_rounds = [r for r in all_rounds if not r.is_final and 'Tie Breaker' not in r.difficulty and 'Clincher' not in r.difficulty]
-    
-    # B. Final Round
     final_round = Round.query.filter_by(event_id=event.id, is_final=True).first()
     
-    # C. Final Phase Clinchers
     final_clinchers = []
     if final_round:
         final_clinchers = Round.query.filter(
@@ -831,7 +826,7 @@ def download_results_pdf(event_id):
             Round.difficulty.like('%Clincher%')
         ).order_by(Round.id.asc()).all()
 
-    # --- 2. CALCULATE SCORES FOR ALL SCHOOLS ---
+    # --- 2. CALCULATE SCORES ---
     schools = School.query.filter_by(event_id=event.id).all()
     rankings = []
     
@@ -845,20 +840,17 @@ def download_results_pdf(event_id):
             'has_final': False
         }
         
-        # 1. Cumulative Scores
         for r in cumulative_rounds:
             score = sum(s.round.points for s in school.scores if s.round_id == r.id and s.is_correct)
             data['cum_breakdown'][r.id] = score
             data['cum_total'] += score
             
-        # 2. Final Round Score
         if final_round:
             if final_round.is_school_allowed(school.id):
                 data['has_final'] = True
                 data['final_score'] = sum(s.round.points for s in school.scores 
                                           if s.round_id == final_round.id and s.is_correct)
         
-        # 3. Clincher Scores
         c_scores_list = []
         for r in final_clinchers:
              if r.is_school_allowed(school.id):
@@ -868,14 +860,12 @@ def download_results_pdf(event_id):
                  c_scores_list.append(-1) 
         
         data['clincher_scores'] = c_scores_list
-        
         data['sort_key'] = (
             data['has_final'], 
             data['final_score'], 
             tuple(c_scores_list), 
             data['cum_total']
         )
-        
         rankings.append(data)
 
     rankings.sort(key=lambda x: x['sort_key'], reverse=True)
@@ -888,11 +878,56 @@ def download_results_pdf(event_id):
     # --- 4. PDF GENERATION (LANDSCAPE) ---
     class PDF(FPDF):
         def header(self):
-            self.set_font('Arial', 'B', 15)
+            # --- CUSTOM HEADER DESIGN ---
+            
+            # 1. Background Image (header.png)
+            header_bg = os.path.join(current_app.root_path, 'static', 'header.png')
+            
+            if os.path.exists(header_bg):
+                # Use the PNG as background (Full width 297mm)
+                self.image(header_bg, x=0, y=0, w=297, h=38)
+            else:
+                # Fallback to Orange Color if image missing
+                self.set_fill_color(227, 82, 5)
+                self.rect(0, 0, 297, 35, 'F')
+
+            # 2. Logo (JPTABS.png)
+            logo_path = os.path.join(current_app.root_path, 'static', 'JPCS.png')
+            if os.path.exists(logo_path):
+                self.image(logo_path, x=12, y=4, w=25)
+
+            # 3. Header Text (White, Times New Roman, Smaller & Higher)
+            self.set_text_color(255, 255, 255)
+            
+            # College Name
+            self.set_xy(40, 4) # Higher Y
+            self.set_font('Times', '', 10) 
+            self.cell(0, 10, "Camarines Sur Polytechnic Colleges", 0, 2, 'L')
+            
+            # Department Name
+            self.set_xy(40, 8) 
+            self.cell(0, 10, "College of Computer Studies", 0, 2, 'L')
+            
+            # Org Name (Bold & Larger)
+            self.set_xy(40, 13) 
+            self.set_font('Times', 'B', 13) 
+            self.cell(0, 10, "Junior Philippine Computer Society", 0, 2, 'L')
+            
+            # Chapter Name
+            self.set_xy(40, 18) 
+            self.set_font('Times', 'B', 10) 
+            self.cell(0, 10, "CSPC Chapter", 0, 2, 'L')
+
+            # --- DOCUMENT TITLE (Below the orange bar) ---
+            self.set_y(30) # Ensure enough space below header image
+            self.set_text_color(0, 0, 0) # Reset to Black
+            self.set_font('Times', 'B', 16) # Changed to Times
             self.cell(0, 10, event.name, 0, 1, 'C')
-            self.set_font('Arial', 'I', 10)
-            self.cell(0, 10, 'Official Final Results', 0, 1, 'C')
+            
+            self.set_font('Times', 'I', 11) # Changed to Times Italic
+            self.cell(0, 5, 'Official Final Results', 0, 1, 'C')
             self.ln(5)
+
         def footer(self):
             self.set_y(-15)
             self.set_font('Arial', 'I', 8)
@@ -902,8 +937,9 @@ def download_results_pdf(event_id):
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
 
-    # --- DYNAMIC COLUMN CONFIG ---
+    # --- TABLE CONFIGURATION ---
     eff_width = pdf.w - 2 * pdf.l_margin
+    
     w_rank = 15
     w_school_min = 60 
     
@@ -922,7 +958,7 @@ def download_results_pdf(event_id):
     if w_col > 25: w_col = 25
     w_school = eff_width - w_rank - (num_score_cols * w_col)
 
-    # --- DRAW HEADER ---
+    # --- DRAW TABLE HEADER ---
     pdf.set_font("Arial", 'B', 10)
     pdf.set_fill_color(230, 230, 230)
     
@@ -933,7 +969,7 @@ def download_results_pdf(event_id):
         pdf.cell(w_col, 10, col['name'], 1, 0, 'C', True)
     pdf.ln()
 
-    # --- DRAW ROWS (WITH TIE RANK LOGIC) ---
+    # --- DRAW TABLE ROWS ---
     pdf.set_font("Arial", '', 10)
     
     previous_sort_key = None
@@ -941,18 +977,11 @@ def download_results_pdf(event_id):
 
     for i, rank in enumerate(rankings):
         current_sort_key = rank['sort_key']
-        
-        # --- TIE RANK LOGIC ---
-        if i == 0:
-            display_rank = 1
-        elif current_sort_key != previous_sort_key:
-            display_rank = i + 1
-        # Else: display_rank remains the same (tied)
-        
+        if i == 0: display_rank = 1
+        elif current_sort_key != previous_sort_key: display_rank = i + 1
         previous_sort_key = current_sort_key
         rank_str = to_ordinal(display_rank)
         
-        # Fill highlight for Top 3 ranks
         fill = False
         if display_rank <= 3: 
             pdf.set_fill_color(255, 248, 220) 
@@ -963,21 +992,17 @@ def download_results_pdf(event_id):
         
         for col in cols:
             val = "-"
-            
             if col['type'] == 'cum_round':
                 val = str(rank['cum_breakdown'].get(col['id'], 0))
-            
             elif col['type'] == 'cum_total':
                 val = str(rank['cum_total'])
                 pdf.set_font("Arial", 'B', 10)
-                
             elif col['type'] == 'final':
                 if rank['has_final']:
                     val = str(rank['final_score'])
                     pdf.set_font("Arial", 'B', 10)
                 else:
                     val = "-" 
-                    
             elif col['type'] == 'clincher':
                 score_list = rank['clincher_scores']
                 idx = col['idx']
@@ -990,16 +1015,20 @@ def download_results_pdf(event_id):
             
         pdf.ln()
 
-    pdf.ln(10)
-
-    # --- SIGNATORIES ---
-    pdf.set_font("Arial", 'B', 10)
+    # --- SIGNATORIES (FORCE NEW PAGE) ---
+    pdf.add_page() 
+    
+    # Header image repeats automatically via header(), so set Y below it
+    pdf.set_y(47) 
+    
+    pdf.set_font("Arial", 'B', 12)
     pdf.cell(0, 10, "Certified Correct & Verified By:", 0, 1, 'C')
-    pdf.ln(10)
+    pdf.ln(15)
 
-    col_count_max = 3
+    # --- GRID SETTINGS UPDATED FOR 4 COLUMNS & TIGHTER SPACING ---
+    col_count_max = 4 # Changed from 3 to 4
     col_width = eff_width / col_count_max
-    row_height = 35
+    row_height = 30 # Reduced height from 35 to 30 (Tighter vertical spacing)
     current_y = pdf.get_y()
 
     def draw_signature_grid(signatories_list, title):
@@ -1008,7 +1037,7 @@ def download_results_pdf(event_id):
         for chunk in chunks:
             if current_y + row_height > 190: 
                 pdf.add_page()
-                current_y = pdf.get_y()
+                current_y = pdf.get_y() + 10
             
             num_in_row = len(chunk)
             row_content_width = num_in_row * col_width
@@ -1018,20 +1047,21 @@ def download_results_pdf(event_id):
             for i, person in enumerate(chunk):
                 display_name = (person.first_name if person.first_name else person.username).upper()
                 x_pos = start_x + (i * col_width)
-                line_width = col_width * 0.6
+                line_width = col_width * 0.85 # Increased width slightly for better balance in 4 cols
                 line_start_x = x_pos + (col_width - line_width) / 2
                 
                 pdf.line(line_start_x, current_y + 15, line_start_x + line_width, current_y + 15)
                 pdf.set_xy(x_pos, current_y + 16)
-                pdf.set_font("Arial", 'B', 9)
+                pdf.set_font("Arial", 'B', 9) # Font size kept readable
                 pdf.cell(col_width, 5, display_name, 0, 2, 'C')
                 pdf.set_font("Arial", 'I', 7)
                 pdf.cell(col_width, 4, title, 0, 0, 'C')
+            
             current_y += row_height
 
     pdf.set_font("Arial", '', 10)
     draw_signature_grid(unique_tabulators, "Official Tabulator")
-    current_y += 10
+    current_y += 10 # Reduced spacing between sections
     
     if admin_signatories:
         draw_signature_grid(admin_signatories, "Administrator")
@@ -1051,6 +1081,7 @@ def download_results_pdf(event_id):
     response.headers['Content-Type'] = 'application/pdf'
     response.headers['Content-Disposition'] = f'attachment; filename=Results_{event.id}.pdf'
     return response
+
 
 # --- TABULATOR ROUTES ---
 
