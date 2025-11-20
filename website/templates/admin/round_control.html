@@ -2,10 +2,10 @@
 {% block title %}Live Round Control{% endblock %}
 
 {% block content %}
-<div class="container-fluid mb-5">
+<div class="container mt-4 mb-5">
     <div class="row">
         
-        <!-- LEFT PANEL: Mission Control & Actions -->
+        <!-- LEFT PANEL: Mission Control (Same as before) -->
         <div class="col-md-4 border-end">
             <h3 class="mb-3">Mission Control</h3>
             <h5 class="text-muted">Event: <strong>{{ event.name }}</strong></h5>
@@ -16,14 +16,12 @@
                 <div class="list-group-item d-flex justify-content-between align-items-center 
                     {% if round.is_active %}bg-primary text-white{% endif %}">
                     
-                    <!-- Round Info -->
                     <div>
                         <h5 class="mb-0">{{ round.difficulty }}</h5>
                         <small class="{% if round.is_active %}text-white-50{% else %}text-muted{% endif %}">
                             <strong>{{ round.total_questions }}</strong> Qs | {{ round.points }} Pts
                         </small>
 
-                        <!-- +1 Button only shows for ACTIVE Tie Breakers -->
                         {% if round.is_active and 'Tie Breaker' in round.difficulty %}
                         <form method="POST" action="{{ url_for('views.add_question', round_id=round.id) }}" class="d-inline ms-2">
                             <button type="submit" class="btn btn-xs btn-outline-dark py-0" title="Add 1 Question">
@@ -33,7 +31,6 @@
                         {% endif %}
                     </div>
 
-                    <!-- Start/Stop Buttons -->
                     <div>
                         {% if round.is_active %}
                             <form method="POST" action="{{ url_for('views.stop_round', round_id=round.id) }}">
@@ -56,13 +53,22 @@
                 {% if round_fully_completed %}
                     {% if active_round.qualifying_count > 0 %}
                         <p class="small text-muted mb-2">
-                            Evaluate scores. Top <strong>{{ active_round.qualifying_count }}</strong> will advance. 
+                            Evaluate scores. Top <strong>{{ active_round.qualifying_count }}</strong> will 
+                            {% if active_round.is_final or 'Final' in active_round.difficulty %}
+                                be declared Winners.
+                            {% else %}
+                                advance.
+                            {% endif %}
                             <br><span class="text-danger">Ties at the cutoff will trigger an automatic Tie Breaker.</span>
                         </p>
                         <form method="POST" action="{{ url_for('views.evaluate_round', round_id=active_round.id) }}">
                             <button type="submit" class="btn btn-success w-100 fw-bold" 
                                     onclick="return confirm('Are you sure? This will finalize rankings for this round.')">
-                                Evaluate & Advance
+                                {% if active_round.is_final or 'Final' in active_round.difficulty %}
+                                    Evaluate (Final)
+                                {% else %}
+                                    Evaluate & Advance
+                                {% endif %}
                             </button>
                         </form>
                     {% else %}
@@ -88,20 +94,35 @@
             
                 <div class="card border-primary shadow-sm mb-4">
                     <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                        <h4 class="mb-0">🔴 LIVE: {{ active_round.difficulty }} Round</h4>
+                        <h4 class="mb-0">
+                            🔴 LIVE: {{ active_round.difficulty }}
+                            {% if show_cumulative %}<span class="fs-6 opacity-75">(Cumulative)</span>{% endif %}
+                        </h4>
                         <button type="button" onclick="location.reload()" class="btn btn-sm btn-light">
                             Refresh Stats ⟳
                         </button>
                     </div>
                     
-                    <div class="card-body">
+                    <div class="card-body table-responsive">
                         <table class="table table-hover align-middle text-center">
                             <thead class="table-light">
                                 <tr>
                                     <th style="width: 50px;">#</th> 
                                     <th class="text-start">School</th>
-                                    <th>Progress</th>
-                                    <th>Score</th>
+                                    <th style="width: 100px;">Progress</th>
+                                    
+                                    <!-- Dynamic Previous Round Headers -->
+                                    {% for r in previous_rounds %}
+                                        <th class="text-muted small">{{ r.difficulty }}</th>
+                                    {% endfor %}
+                                    
+                                    <!-- Current Round Header -->
+                                    <th class="fw-bold text-primary">{{ active_round.difficulty }}</th>
+
+                                    <!-- Total Header (Only if Cumulative) -->
+                                    {% if show_cumulative %}
+                                        <th class="bg-warning text-dark">TOTAL</th>
+                                    {% endif %}
                                 </tr>
                             </thead>
                             
@@ -109,37 +130,46 @@
                                 {% for stat in live_scores %}
                                 <tr class="{% if loop.index <= active_round.qualifying_count and active_round.qualifying_count > 0 %}table-success{% endif %}">
                                     
-                                    <!-- Rank Number -->
+                                    <!-- Rank -->
                                     <td class="fw-bold text-muted">{{ loop.index }}</td>
                                     
-                                    <!-- School Name -->
+                                    <!-- Name -->
                                     <td class="text-start fw-bold">
                                         {{ stat.school }}
-                                        <!-- Green Check for Qualifiers -->
                                         {% if loop.index <= active_round.qualifying_count and active_round.qualifying_count > 0 %}
-                                            <i class="fas fa-check-circle text-success small ms-1" title="Qualifying Spot"></i>
+                                            <i class="fas fa-check-circle text-success small ms-1"></i>
                                         {% endif %}
                                     </td>
                                     
                                     <!-- Progress Bar -->
-                                    <td style="width: 40%;">
-                                        <div class="progress" style="height: 20px;">
-                                            {% set percent = (stat.answered / stat.total) * 100 %}
+                                    <td>
+                                        <div class="progress" style="height: 15px;">
+                                            {% set percent = (stat.answered / stat.total_q) * 100 %}
                                             <div class="progress-bar bg-success" role="progressbar" 
                                                  style="width: {{ percent | round | int }}%;">
-                                                {{ stat.answered }} / {{ stat.total }}
+                                                <small>{{ stat.answered }}/{{ stat.total_q }}</small>
                                             </div>
                                         </div>
                                     </td>
                                     
-                                    <!-- Score -->
-                                    <td>
-                                        <span class="badge bg-dark fs-5">{{ stat.score }}</span>
-                                    </td>
+                                    <!-- Previous Round Scores -->
+                                    {% for r in previous_rounds %}
+                                        <td class="text-muted">{{ stat.breakdown.get(r.id, 0) }}</td>
+                                    {% endfor %}
+
+                                    <!-- Current Round Score -->
+                                    <td class="fw-bold text-primary fs-5">{{ stat.current_score }}</td>
+
+                                    <!-- Total Score -->
+                                    {% if show_cumulative %}
+                                        <td class="bg-warning bg-opacity-25 fw-bold fs-5 text-dark">
+                                            {{ stat.total_score }}
+                                        </td>
+                                    {% endif %}
                                 </tr>
                                 {% else %}
                                 <tr>
-                                    <td colspan="4" class="text-muted">No data yet. Waiting for tabulators...</td>
+                                    <td colspan="10" class="text-muted py-4">No data yet. Waiting for tabulators...</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
