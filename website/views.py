@@ -7,6 +7,10 @@ from werkzeug.security import generate_password_hash
 from fpdf import FPDF
 from itertools import groupby 
 import os
+import socket
+import qrcode
+import io
+from flask import send_file
 
 views = Blueprint('views', __name__)
 
@@ -25,6 +29,16 @@ def set_active_event(event_id):
         db.session.commit()
         return True
     return False
+
+def get_network_ip():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except:
+        return "127.0.0.1"
 
 @views.route('/')
 def home():
@@ -148,7 +162,35 @@ def leaderboard():
 @login_required
 def admin_dashboard():
     if current_user.role != 'admin': return "Unauthorized", 403
-    return render_template('admin/admin_dashboard.html')
+    
+    server_ip = get_network_ip()
+    server_url = f"http://{server_ip}:5000"
+    
+    return render_template('admin/admin_dashboard.html', server_url=server_url)
+
+# --- QR CODE ROUTE ---
+@views.route('/admin/generate-qr')
+@login_required
+def generate_qr():
+    if current_user.role != 'admin': return "Unauthorized", 403
+    
+    # 1. Determine the URL
+    ip = get_network_ip()
+    port = 5000 # Default Flask port
+    url = f"http://{ip}:{port}"
+    
+    # 2. Generate QR Image
+    qr = qrcode.QRCode(version=1, box_size=10, border=5)
+    qr.add_data(url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    
+    # 3. Save to Byte Stream (in-memory, no file saved)
+    img_io = io.BytesIO()
+    img.save(img_io, 'PNG')
+    img_io.seek(0)
+    
+    return send_file(img_io, mimetype='image/png')
 
 @views.route('/admin/register-user', methods=['GET', 'POST'])
 @login_required
