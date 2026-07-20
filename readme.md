@@ -1,4 +1,4 @@
-# 🏆 Quiz Bee Tabulation System  
+# Quiz Bee Tabulation System  
 **Automated Tournament Logic Engine for Academic Competitions**
 
 A specialized, enterprise-grade tabulation system designed to handle complex academic competition rules, including Hybrid Scoring (Cumulative + Clean Slate), Recursive Tie-Breaking, and Real-time Leaderboards.  
@@ -6,30 +6,30 @@ Built for the **Junior Philippine Computer Society – CSPC Chapter**.
 
 ---
 
-## 🌟 Key Features
+## Key Features
 
-### ⚙️ Advanced Scoring Engine
+### Advanced Scoring Engine
 - **Hybrid Logic:** Automatically switches between Cumulative Scoring (eliminations) and Back-to-Zero/Clean Slate (final round).  
 - **Flexible Configuration:** Supports strict "Cumulative" or simple "Per Round" modes.
 
-### ⚔️ Iterative & Recursive Tie-Breaking
+### Iterative & Recursive Tie-Breaking
 - **Smart Detection:** Detects ties at qualifying cutoffs (e.g., 3 schools tied for the last slot).  
 - **Recursive Clincher Rounds:** If tied again, the system auto-creates Clincher 2, 3, etc.  
 - **Strict Final Ranking:** Enforces Gold–Silver–Bronze by forcing tie-breakers until all positions are unique.
 
-### 🖥️ Role-Based Dashboards
+### Role-Based Dashboards
 - **Admin Mission Control:** Real-time monitor, round lock/unlock, and instant “Sudden Death” (+1 Q).  
 - **Tabulator Panel:** Secure parallel scoring interface for rapid data entry.  
 - **Live Leaderboard:** Auto-updates, hides cumulative info in finals, highlights active teams and winners.
 
-### 📄 Official Reporting
+### Official Reporting
 - **Automated PDF Generation** using FPDF.  
 - **Dynamic Layout:** Adjusts automatically based on rounds played.  
 - **Digital Signatories:** Auto-generated blocks for Tabulators and Head Admin.
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 **Backend:** Python, Flask, SQLAlchemy  
 **Database:** SQLite (Development)  
@@ -39,7 +39,7 @@ Built for the **Junior Philippine Computer Society – CSPC Chapter**.
 
 ---
 
-## 🚀 Installation & Setup
+## Installation & Setup
 
 ### 1. Clone the Repository
 ```bash
@@ -75,7 +75,7 @@ The app will run at **[http://127.0.0.1:5000](http://127.0.0.1:5000)**.
 
 ---
 
-## 📖 User Guide
+## User Guide
 
 ### 1. **Admin (Mission Control)**
 
@@ -99,13 +99,13 @@ The app will run at **[http://127.0.0.1:5000](http://127.0.0.1:5000)**.
 
 ---
 
-## 📸 System Screenshots
+## System Screenshots
 
 *(Insert Mission Control, Scoring Page, Leaderboard images here)*
 
 ---
 
-## 👥 Credits & Acknowledgements
+## Credits & Acknowledgements
 
 **Developed By:**
 Guiller Angelo Hermoso – Director for Projects 2025
@@ -116,7 +116,7 @@ Junior Philippine Computer Society – CSPC Chapter
 
 ---
 
-## 📄 License
+## License
 
 This project is proprietary software developed for JPCS-CSPC.
 
