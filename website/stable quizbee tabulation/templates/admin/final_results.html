@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Official Final Results{% endblock %}
+
+{% block content %}
+
+<div class="container mt-4 mb-5">
+    
+    <!-- Controls -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <a href="{{ url_for('views.round_control') }}" class="btn btn-outline-secondary">
+            &larr; Back to Control
+        </a>
+        <a href="{{ url_for('views.download_results_pdf', event_id=event.id) }}" class="btn btn-danger btn-lg shadow">
+            <i class="fas fa-file-pdf me-2"></i> Download Official PDF
+        </a>
+    </div>
+
+    <!-- Result Paper UI -->
+    <div class="card shadow-lg border-0" style="min-height: 800px;">
+        <div class="card-body p-5">
+            
+            <!-- Header -->
+            <div class="text-center mb-5">
+                <h1 class="fw-bold text-uppercase display-5" style="font-family: 'Times New Roman', serif; letter-spacing: 2px;">
+                    {{ event.name }}
+                </h1>
+                <div class="d-flex justify-content-center align-items-center mt-3">
+                    <hr class="w-25 me-3" style="border-top: 2px solid #333; opacity: 1;">
+                    <span class="text-uppercase fw-bold text-muted" style="letter-spacing: 2px;">Official Final Results</span>
+                    <hr class="w-25 ms-3" style="border-top: 2px solid #333; opacity: 1;">
+                </div>
+                <p class="small text-muted fst-italic mt-2">
+                    {{ event.scoring_type|capitalize }} Scoring System
+                </p>
+            </div>
+
+            <!-- Rankings Table -->
+            <div class="table-responsive">
+                <table class="table table-hover align-middle text-center mb-5 border-bottom">
+                    <thead class="bg-dark text-white text-uppercase small">
+                        <tr>
+                            <th class="py-3" style="width: 100px;">Rank</th>
+                            <th class="py-3 text-start">School / Contestant</th>
+                            <th class="py-3" style="width: 150px;">Final Score</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rank in rankings %}
+                        <tr class="{% if loop.index == 1 %}bg-warning bg-opacity-10{% endif %}">
+                            <!-- Rank Column -->
+                            <td class="fw-bold fs-4 py-3">
+                                {% if loop.index == 1 %}
+                                    <i class="fas fa-trophy text-warning me-1"></i> 1st
+                                {% elif loop.index == 2 %}
+                                    <span class="text-secondary">🥈 2nd</span>
+                                {% elif loop.index == 3 %}
+                                    <span class="text-warning-emphasis">🥉 3rd</span>
+                                {% else %}
+                                    <span class="text-muted">{{ loop.index }}th</span>
+                                {% endif %}
+                            </td>
+                            
+                            <!-- Name Column -->
+                            <td class="text-start fw-bold fs-5 py-3" style="font-family: 'Georgia', serif;">
+                                {{ rank.name }}
+                            </td>
+                            
+                            <!-- Score Column -->
+                            <td class="fw-bold fs-4 py-3 text-dark">
+                                {% if rank.has_final %}
+                                    {{ rank.final_score }}
+                                {% else %}
+                                    <span class="text-muted fs-6">Did not qualify</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Signatories List (Web View) -->
+            <div class="mt-5 pt-3">
+                <h6 class="text-center mb-4 text-uppercase fw-bold small text-muted" style="text-decoration: underline;">
+                    Certified Correct & Verified By:
+                </h6>
+                
+                <div class="row justify-content-center">
+                    <!-- Tabulators List -->
+                    <div class="col-md-5 text-center mb-4">
+                        <h6 class="fw-bold text-primary mb-3"><i class="fas fa-users me-2"></i>Official Tabulators</h6>
+                        <ul class="list-unstyled text-muted">
+                            {% for tab in tabulators %}
+                            <li class="mb-1">
+                                {{ tab.first_name if tab.first_name else tab.username }}
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+
+                    <!-- Admins List -->
+                    <div class="col-md-5 text-center mb-4">
+                        <h6 class="fw-bold text-danger mb-3"><i class="fas fa-user-shield me-2"></i>Administrators</h6>
+                        <ul class="list-unstyled text-muted">
+                            <li class="mb-1 fw-bold text-dark">
+                                {{ admin.first_name if admin.first_name else admin.username }} (Head)
+                            </li>
+                            {% for a in admins %}
+                            <li class="mb-1">
+                                {{ a.first_name if a.first_name else a.username }}
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+</div>
+
+{% endblock %}

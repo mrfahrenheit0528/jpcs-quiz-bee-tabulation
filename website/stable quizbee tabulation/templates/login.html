@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Login - JPCS{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center min-vh-100 align-items-center" style="margin-top: -60px;">
+        <div class="col-md-5 col-lg-4">
+            
+            <!-- Brand Section -->
+            <div class="text-center mb-4">
+                <img src="{{ url_for('static', filename='JPCS LOGO VARIANT 1.png') }}" alt="Logo" class=" mb-3" style="width: 90px;">
+                <h3 class="fw-bold" style="color: var(--jpcs-maroon);">JPCS-CSPC</h3>
+                <p class="text-muted small text-uppercase letter-spacing-1">Tabulation System</p>
+            </div>
+
+            <!-- Login Card -->
+            <div class="card shadow-lg border-0 rounded-4">
+                <div class="card-body p-4">
+                    <h5 class="card-title text-center mb-4 fw-bold text-secondary">Sign In</h5>
+                    
+                    <form method="POST">
+                        <div class="form-floating mb-3">
+                            <input type="text" class="form-control" id="username" name="username" placeholder="Username" required>
+                            <label for="username"><i class="fas fa-user me-2 text-muted"></i>Username</label>
+                        </div>
+
+                        <div class="form-floating mb-3">
+                            <input type="password" class="form-control" id="password" name="password" placeholder="Password" required>
+                            <label for="password"><i class="fas fa-lock me-2 text-muted"></i>Password</label>
+                        </div>
+
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary btn-lg fw-bold text-uppercase" style="letter-spacing: 1px;">
+                                Login
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="text-center mt-4">
+                <small class="text-muted">&copy; Junior Philippine Computer Society</small>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

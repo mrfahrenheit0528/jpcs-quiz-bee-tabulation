@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12 d-flex justify-content-between align-items-center">
+            <div>
+                <h2>Admin Dashboard</h2>
+                <p class="lead">Welcome, Administrator. Select an action below.</p>
+            </div>
+            <!-- NEW: CONNECT BUTTON -->
+            <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#connectModal">
+                <i class="fas fa-qrcode me-2"></i> Connect Tabulators
+            </button>
+        </div>
+        <hr>
+    </div>
+
+    <div class="row mt-3">
+        <!-- ... (Keep your existing 3 cards for Event, User, Round Control here) ... -->
+        
+        <!-- 1. Manage Events -->
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 shadow-sm border-primary">
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title text-primary">
+                        <i class="fas fa-calendar-alt"></i> Event Management
+                    </h5>
+                    <p class="card-text">Create new events, define rounds, and register schools.</p>
+                    <a href="{{ url_for('views.event_registration') }}" class="btn btn-primary w-100 mt-auto">Go to Events List</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Manage Users -->
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 shadow-sm border-success">
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title text-success">
+                        <i class="fas fa-users"></i> User Management
+                    </h5>
+                    <p class="card-text">Create and manage Tabulator accounts.</p>
+                    <a href="{{ url_for('views.register_user') }}" class="btn btn-success w-100 mt-auto">Manage Users</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Live Round Control -->
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 shadow-sm border-danger">
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title text-danger">
+                        <i class="fas fa-satellite-dish"></i> Live Round Control
+                    </h5>
+                    <p class="card-text">Monitor live scores, start/stop rounds, and manage tie-breakers.</p>
+                    <a href="{{ url_for('views.round_control') }}" class="btn btn-danger w-100 mt-auto">Go to Mission Control</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CONNECT DEVICES MODAL -->
+<div class="modal fade" id="connectModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content text-center">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title"><i class="fas fa-wifi me-2"></i>Connect Tabulators</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="text-muted">Scan this code with the Tabulator's device (Phone/Tablet) to open the system.</p>
+                
+                <!-- QR Code Image -->
+                <div class="border p-2 d-inline-block rounded mb-3">
+                    <img src="{{ url_for('views.generate_qr') }}" alt="Connection QR" class="img-fluid" style="max-width: 250px;">
+                </div>
+                
+                <h4 class="fw-bold text-primary">{{ server_url }}</h4>
+                <p class="small text-muted">Make sure all devices are connected to the same Wi-Fi network.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary w-100" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}Live Round Control{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5">
+    <div class="row">
+        <!-- LEFT PANEL: Mission Control -->
+        <div class="col-md-4 border-end">
+            <h3 class="mb-3">Mission Control</h3>
+            <h5 class="text-muted">Event: <strong>{{ event.name }}</strong></h5>
+            <hr>
+            <div class="list-group mb-4">
+                {% for round in rounds %}
+                <div class="list-group-item d-flex justify-content-between align-items-center 
+                    {% if round.is_active %}bg-primary text-white{% endif %}">
+                    <div>
+                        <h5 class="mb-0">{{ round.difficulty }}</h5>
+                        <small class="{% if round.is_active %}text-white-50{% else %}text-muted{% endif %}">
+                            <strong>{{ round.total_questions }}</strong> Qs | {{ round.points }} Pts
+                        </small>
+                        
+                        {% if round.is_active and ('Tie Breaker' in round.difficulty or 'Clincher' in round.difficulty) %}
+                        <form method="POST" action="{{ url_for('views.add_question', round_id=round.id) }}" class="d-inline ms-2">
+                            <button type="submit" class="btn btn-xs btn-outline-dark py-0" title="Add 1 Question">+1 Q</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                    <div>
+                        {% if round.is_active %}
+                            <form method="POST" action="{{ url_for('views.stop_round', round_id=round.id) }}">
+                                <button type="submit" class="btn btn-light btn-sm fw-bold text-danger">STOP ⏹</button>
+                            </form>
+                        {% else %}
+                            <form method="POST" action="{{ url_for('views.activate_round', round_id=round.id) }}">
+                                <button type="submit" class="btn btn-outline-success btn-sm">START ▶</button>
+                            </form>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Evaluation Button -->
+            <div class="mt-3 p-3 bg-success bg-opacity-10 border border-success rounded">
+                <h6 class="text-success-emphasis"><i class="fas fa-check-circle"></i> Round Evaluation</h6>
+                {% if round_fully_completed %}
+                    <p class="small text-muted mb-2">Round Complete. Evaluate to update rankings or create clinchers.</p>
+                    <form method="POST" action="{{ url_for('views.evaluate_round', round_id=active_round.id) }}">
+                        <button type="submit" class="btn btn-success w-100 fw-bold" onclick="return confirm('Proceed with evaluation?')">
+                            Evaluate
+                        </button>
+                    </form>
+                {% else %}
+                    <div class="alert alert-light border-secondary p-2 mb-0 text-center">
+                        <small class="text-muted"><i class="fas fa-lock"></i> Evaluation Locked</small>
+                    </div>
+                {% endif %}
+            </div>
+            
+            <!-- Manual Link to Final Results -->
+            <div class="mt-3">
+                <a href="{{ url_for('views.final_results', event_id=event.id) }}" class="btn btn-outline-primary w-100 fw-bold">
+                    <i class="fas fa-trophy me-2"></i> View Official Results
+                </a>
+            </div>
+        </div>
+
+        <!-- RIGHT PANEL: Live Scoreboard -->
+        <div class="col-md-8">
+            {% if active_round %}
+                <div class="card border-primary shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center gap-2">
+                            <h4 class="mb-0">🔴 LIVE: {{ active_round.difficulty }}</h4>
+                            
+                            <!-- Explicitly show the cutoff rule -->
+                            {% if active_round.qualifying_count > 0 and 'Clincher' not in active_round.difficulty %}
+                                <span class="badge bg-light text-primary border rounded-pill">
+                                    Top {{ active_round.qualifying_count }} Advance
+                                </span>
+                            {% endif %}
+                            
+                            <!-- Explicitly show Scoring Mode -->
+                            {% if show_cumulative %}
+                                <span class="badge bg-warning text-dark border rounded-pill ms-1">
+                                    Cumulative
+                                </span>
+                            {% endif %}
+                        </div>
+                        <button type="button" onclick="location.reload()" class="btn btn-sm btn-light">Refresh Stats ⟳</button>
+                    </div>
+                    <div class="card-body table-responsive">
+                        <table class="table table-hover align-middle text-center">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>#</th>
+                                    <th class="text-start">School</th>
+                                    <th>Progress</th>
+                                    <!-- Dynamic Header: Shows 'Cumulative Score' or 'Score (This Round)' -->
+                                    <th>
+                                        {% if show_cumulative %}
+                                            Cumulative Score
+                                        {% else %}
+                                            Score (This Round)
+                                        {% endif %}
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for stat in live_scores %}
+                                    <!-- COLOR CODING LOGIC -->
+                                    {% set row_class = "" %}
+                                    {% set q_count = active_round.qualifying_count or 0 %}
+                                    
+                                    {% if 'Clincher' in active_round.difficulty %}
+                                        <!-- CLINCHER LOGIC: Gold/Red -->
+                                        {% if stat.current_score > 0 and stat.current_score == live_scores[0].current_score %}
+                                            {% set row_class = "table-warning" %} <!-- Gold for leader -->
+                                        {% elif stat.answered > 0 and stat.current_score < live_scores[0].current_score %}
+                                            {% set row_class = "table-danger" %}  <!-- Red for falling behind -->
+                                        {% endif %}
+                                    {% else %}
+                                        <!-- NORMAL ROUND LOGIC: Green for Qualifiers -->
+                                        {% if q_count > 0 and loop.index <= q_count %}
+                                            {% set row_class = "table-success" %}
+                                        {% endif %}
+                                    {% endif %}
+
+                                <tr class="{{ row_class }}">
+                                    <td class="fw-bold text-muted">{{ loop.index }}</td>
+                                    <td class="text-start fw-bold">
+                                        {{ stat.school }}
+                                        <!-- Green Checkmark for normal qualifying rounds -->
+                                        {% if 'Clincher' not in active_round.difficulty and q_count > 0 and loop.index <= q_count %}
+                                            <i class="fas fa-check-circle text-success small ms-1" title="Qualifying Spot"></i>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="progress" style="height: 15px;">
+                                            {% set percent = (stat.answered / stat.total_q) * 100 %}
+                                            <div class="progress-bar bg-success" style="width: {{ percent }}%;">
+                                                <small>{{ stat.answered }}/{{ stat.total_q }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <!-- Display the calculated score (Cumulative or Current) -->
+                                    <td class="fw-bold fs-5">{{ stat.display_score }}</td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="4" class="text-muted py-4">No data yet.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% else %}
+                <div class="alert alert-secondary text-center mb-4 p-5">
+                    <h4>No Round Active</h4>
+                    <p>Select a round on the left and click START.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

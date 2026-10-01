@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Tabulator Dashboard{% endblock %}
+
+{% block content %}
+
+<!-- Added container class to fix margins -->
+<div class="container mt-4">
+    
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h2 class="mb-0">Welcome, {{ current_user.username }}</h2>
+            <p class="text-muted mb-0">
+                Assigned School: 
+                <span class="fw-bold text-primary">
+                    {{ school.name if school else "Not Assigned" }}
+                </span>
+            </p>
+        </div>
+        
+        {% if active_event %}
+            <span class="badge bg-info text-dark border">
+                Event: {{ active_event.name }}
+            </span>
+        {% endif %}
+    </div>
+    <hr>
+
+    {% if not active_event %}
+        <div class="alert alert-warning shadow-sm" role="alert">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            No active Quiz Bee Event has been set by the Admin yet.
+        </div>
+    {% elif not school %}
+         <div class="alert alert-danger shadow-sm" role="alert">
+            <i class="fas fa-user-times me-2"></i>
+            You are not assigned to a school for the active event (<strong>{{ active_event.name }}</strong>). 
+            Please contact the Admin.
+        </div>
+    {% elif not rounds %}
+        <div class="alert alert-info shadow-sm" role="alert">
+            Event <strong>{{ active_event.name }}</strong> is active, but no rounds have been created yet.
+        </div>
+    {% else %}
+        
+        <div class="card shadow-sm">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0"><i class="fas fa-list-ul me-2"></i>Available Rounds</h5>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for round in rounds %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center p-3">
+                        <div>
+                            <h5 class="mb-1 fw-bold text-dark">{{ round.difficulty }}</h5> 
+                            <small class="text-muted">
+                                <i class="fas fa-question-circle me-1"></i> {{ round.total_questions }} Questions 
+                                &bull; 
+                                <i class="fas fa-star me-1"></i> {{ round.points }} Pts each
+                            </small>
+                        </div>
+
+                        <div>
+                            {% if round.is_active %}
+                                <!-- Check if school is allowed in this round (e.g. Tie Breaker filter) -->
+                                {% if round.is_school_allowed(school.id) %}
+                                    <!-- ACTIVE: Green Button -->
+                                    <a href="{{ url_for('views.scoring', round_id=round.id) }}" 
+                                       class="btn btn-success fw-bold shadow-sm">
+                                       ENTER SCORING <i class="fas fa-chevron-right ms-1"></i>
+                                    </a>
+                                {% else %}
+                                    <!-- NOT PARTICIPATING -->
+                                    <button class="btn btn-secondary btn-sm" disabled>
+                                        Not Participating <i class="fas fa-ban ms-1"></i>
+                                    </button>
+                                {% endif %}
+
+                            {% else %}
+                                <!-- INACTIVE: Grey Button (Disabled) -->
+                                <button class="btn btn-outline-secondary btn-sm" disabled>
+                                    Waiting for Admin... <i class="fas fa-hourglass-half ms-1"></i>
+                                </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+    {% endif %}
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block title %}Round Configuration{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>Setup Rounds</h2>
+            <h5 class="text-muted">Event: <strong>{{ event.name }}</strong></h5>
+        </div>
+        <a href="{{ url_for('views.event_registration') }}" class="btn btn-outline-secondary">
+            &larr; Back to Events List
+        </a>
+    </div>
+
+    <div class="row">
+        <!-- LEFT COLUMN: Add Round Form -->
+        <div class="col-md-4">
+            <div class="card shadow-sm border-primary mb-4">
+                <div class="card-header bg-primary text-white">
+                    <i class="fas fa-plus-circle"></i> Add New Round
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        
+                        <!-- Order -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Order #</label>
+                            <input type="number" name="round_number" class="form-control" placeholder="e.g. 1" required>
+                            <div class="form-text">1=First round, 2=Second...</div>
+                        </div>
+
+                        <!-- Difficulty Name -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Round Name</label>
+                            <input type="text" name="difficulty" class="form-control" list="difficultyOptions" placeholder="Type or select..." required>
+                            <datalist id="difficultyOptions">
+                                <option value="Easy">
+                                <option value="Average">
+                                <option value="Difficult">
+                                <option value="Clincher">
+                            </datalist>
+                        </div>
+
+                        <!-- Points -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Points per Question</label>
+                            <div class="input-group">
+                                <span class="input-group-text">Pts</span>
+                                <input type="number" name="points" class="form-control" placeholder="e.g. 5" required>
+                            </div>
+                        </div>
+
+                        <!-- Questions Count -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Total Questions</label>
+                            <div class="input-group">
+                                <span class="input-group-text">Qty</span>
+                                <input type="number" name="total_questions" class="form-control" placeholder="e.g. 10" required>
+                            </div>
+                        </div>
+                        
+                        <!-- Qualifiers -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Qualifiers (Advance)</label>
+                            <input type="number" name="qualifying_count" class="form-control" placeholder="e.g. 10 (0 = All)">
+                            <div class="form-text">Top N schools to advance.</div>
+                        </div>
+
+                        <!-- Is Final -->
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="is_final" name="is_final">
+                            <label class="form-check-label fw-bold" for="is_final">Is Final Round?</label>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100">Save Round</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: List of Rounds -->
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    Current Rounds Configuration
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0 align-middle text-center">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th class="text-start">Round Name</th>
+                                <th>Points</th>
+                                <th>Questions</th>
+                                <th>Qualifiers</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for round in rounds %}
+                            <tr class="{% if round.is_final %}table-warning{% endif %}">
+                                <td class="fw-bold">{{ round.number }}</td>
+                                <td class="text-start">
+                                    {{ round.difficulty }}
+                                    {% if round.is_final %}<span class="badge bg-warning text-dark ms-1">FINAL</span>{% endif %}
+                                </td>
+                                <td><span class="badge bg-info text-dark">{{ round.points }} pts</span></td>
+                                <td>{{ round.total_questions }}</td>
+                                <td>{{ round.qualifying_count if round.qualifying_count > 0 else "All" }}</td>
+                                <td>
+                                    <!-- EDIT BUTTON -->
+                                    <button type="button" class="btn btn-sm btn-outline-primary me-1" 
+                                            data-bs-toggle="modal" 
+                                            data-bs-target="#editRoundModal{{ round.id }}">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+
+                                    <!-- DELETE BUTTON -->
+                                    <form method="POST" action="{{ url_for('views.delete_round', round_id=round.id) }}" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this round?')">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+
+                            <!-- EDIT MODAL FOR THIS ROUND -->
+                            <div class="modal fade" id="editRoundModal{{ round.id }}" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content text-start">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Edit Round: {{ round.difficulty }}</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <form method="POST" action="{{ url_for('views.edit_round', round_id=round.id) }}">
+                                            <div class="modal-body">
+                                                
+                                                <div class="row g-2 mb-3">
+                                                    <div class="col-4">
+                                                        <label class="form-label">Order #</label>
+                                                        <input type="number" name="round_number" class="form-control" value="{{ round.number }}" required>
+                                                    </div>
+                                                    <div class="col-8">
+                                                        <label class="form-label">Round Name</label>
+                                                        <input type="text" name="difficulty" class="form-control" value="{{ round.difficulty }}" required>
+                                                    </div>
+                                                </div>
+
+                                                <div class="row g-2 mb-3">
+                                                    <div class="col-6">
+                                                        <label class="form-label">Points</label>
+                                                        <input type="number" name="points" class="form-control" value="{{ round.points }}" required>
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <label class="form-label">Items</label>
+                                                        <input type="number" name="total_questions" class="form-control" value="{{ round.total_questions }}" required>
+                                                    </div>
+                                                </div>
+
+                                                <div class="mb-3">
+                                                    <label class="form-label">Qualifiers (Advancing)</label>
+                                                    <input type="number" name="qualifying_count" class="form-control" value="{{ round.qualifying_count }}">
+                                                </div>
+
+                                                <div class="form-check">
+                                                    <input type="checkbox" class="form-check-input" name="is_final" id="editFinal{{ round.id }}" 
+                                                           {% if round.is_final %}checked{% endif %}>
+                                                    <label class="form-check-label" for="editFinal{{ round.id }}">Is Final Round?</label>
+                                                </div>
+
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                <button type="submit" class="btn btn-primary">Save Changes</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-5">
+                                    <em>No rounds created yet.</em>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
