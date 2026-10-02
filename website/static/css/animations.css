@@ -1,0 +1,138 @@
+/* =========================================================
+   JPCS Tabulation — Motion Layer
+   Shared animations used across all pages.
+   ========================================================= */
+
+:root {
+    --ease-out: cubic-bezier(.2, .7, .2, 1);
+    --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
+}
+
+/* --- KEYFRAMES --- */
+@keyframes fade-in      { from { opacity: 0; } }
+@keyframes rise         { from { opacity: 0; transform: translateY(18px); } }
+@keyframes drop-in      { from { opacity: 0; transform: translateY(-24px) scale(.96); } }
+@keyframes pop          { 0% { transform: scale(.6); opacity: 0; } 60% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes float        { 50% { transform: translateY(-8px); } }
+@keyframes drift        { 50% { transform: translate(-30px, 20px) scale(1.08); } }
+@keyframes pulse-dot    { 0% { box-shadow: 0 0 0 0 rgba(25, 135, 84, .6); } 100% { box-shadow: 0 0 0 10px rgba(25, 135, 84, 0); } }
+@keyframes pulse-live   { 0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, .7); } 100% { box-shadow: 0 0 0 8px rgba(255, 255, 255, 0); } }
+@keyframes glow         { 50% { box-shadow: 0 0 0 4px rgba(227, 82, 5, .35); } }
+@keyframes bar-grow     { from { width: 0; } }
+@keyframes score-flash  { 0% { box-shadow: inset 0 0 0 9999px rgba(227, 82, 5, .45); } 100% { box-shadow: inset 0 0 0 9999px rgba(227, 82, 5, 0); } }
+@keyframes shimmer      { from { background-position: -200% 0; } to { background-position: 200% 0; } }
+@keyframes trophy-bounce{ 0%, 100% { transform: translateY(0) rotate(0); } 25% { transform: translateY(-6px) rotate(-8deg); } 50% { transform: translateY(0) rotate(0); } 75% { transform: translateY(-3px) rotate(6deg); } }
+@keyframes shake        { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+@keyframes spin         { to { transform: rotate(360deg); } }
+
+/* NOTE: entrance animations use `backwards` fill, never `both`/`forwards`.
+   A forwards-filled animation keeps a stacking context on the element after it ends,
+   which traps Bootstrap modals beneath their backdrop and makes them unclickable. */
+
+/* Bootstrap's display utilities (.d-flex etc.) use !important and would otherwise
+   override the hidden attribute, leaving "hidden" overlays visible */
+[hidden] { display: none !important; }
+
+/* --- PAGE ENTRANCE --- */
+.page-enter { animation: fade-in .35s ease-out backwards; }
+
+/* --- STAGGERED REVEAL ---
+   Put data-stagger on a parent; its children rise in one after another. */
+[data-stagger] > * {
+    animation: rise .55s var(--ease-out) backwards;
+    animation-delay: calc(var(--stagger-base, 0s) + var(--i, 0) * 70ms);
+}
+[data-stagger] > :nth-child(2)  { --i: 1; }
+[data-stagger] > :nth-child(3)  { --i: 2; }
+[data-stagger] > :nth-child(4)  { --i: 3; }
+[data-stagger] > :nth-child(5)  { --i: 4; }
+[data-stagger] > :nth-child(6)  { --i: 5; }
+[data-stagger] > :nth-child(7)  { --i: 6; }
+[data-stagger] > :nth-child(8)  { --i: 7; }
+[data-stagger] > :nth-child(9)  { --i: 8; }
+[data-stagger] > :nth-child(n+10) { --i: 9; }
+
+.anim-rise { animation: rise .6s var(--ease-out) backwards; animation-delay: var(--delay, 0s); }
+.anim-pop  { animation: pop .45s var(--ease-spring) backwards; }
+
+/* Live-refreshed regions must not replay entrance animations */
+.is-live-updated [data-stagger] > *,
+.is-live-updated .anim-rise,
+.is-live-updated .progress-bar { animation: none; }
+.is-live-updated [data-stagger] > .anim-pop { animation: pop .45s var(--ease-spring) backwards; }
+
+/* --- FLASH MESSAGES --- */
+#flash-messages-container .alert { animation: drop-in .45s var(--ease-spring) backwards; }
+#flash-messages-container .alert.fade:not(.show) { transform: translateY(-16px); transition: opacity .3s, transform .3s; }
+
+/* --- INTERACTIVE FEEDBACK --- */
+.btn { transition: transform .12s ease, box-shadow .2s ease, background-color .2s, color .2s, border-color .2s; }
+.btn:active:not(:disabled) { transform: scale(.96); }
+
+.card { transition: transform .25s var(--ease-out), box-shadow .25s ease; }
+.hover-lift:hover,
+.hover-scale:hover { transform: translateY(-6px); box-shadow: 0 .9rem 2rem rgba(128, 0, 0, .15) !important; }
+.hover-scale:hover .feature-icon { transform: scale(1.15) rotate(-6deg); }
+.feature-icon { display: inline-block; transition: transform .3s var(--ease-spring); }
+
+.list-group-item { transition: background-color .25s, transform .2s var(--ease-out); }
+.list-hover .list-group-item:hover { transform: translateX(4px); }
+
+.nav-link { transition: color .2s; }
+.navbar-brand img { transition: transform .3s var(--ease-spring); }
+.navbar-brand:hover img { transform: scale(1.06); }
+
+/* Button loading state (set by animations.js on form submit) */
+.btn.is-loading { pointer-events: none; opacity: .85; }
+.btn-spinner {
+    display: inline-block; width: 1em; height: 1em; margin-right: .5em; vertical-align: -.15em;
+    border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%;
+    animation: spin .7s linear infinite;
+}
+
+/* --- LIVE INDICATORS --- */
+.live-dot {
+    display: inline-block; width: .7rem; height: .7rem; border-radius: 50%;
+    background: #198754; animation: pulse-dot 1.4s ease-out infinite; vertical-align: middle;
+}
+.live-dot-light { background: #ff4d4d; animation-name: pulse-live; }
+.glow-active { animation: glow 2s ease-in-out infinite; position: relative; z-index: 1; }
+
+.progress-bar { animation: bar-grow .9s var(--ease-out) backwards; transition: width .6s var(--ease-out); }
+
+/* --- LEADERBOARD --- */
+.flip-row { will-change: transform; }
+/* Fixed attachment makes the sweep continuous across every cell of the row */
+.rank-1 > td { background-image: linear-gradient(100deg, transparent 35%, rgba(255, 215, 0, .35) 50%, transparent 65%);
+               background-size: 200% 100%; background-attachment: fixed; animation: shimmer 3.5s linear infinite; }
+td.score-changed { animation: score-flash 1.6s ease-out; }
+.score-changed .score-value { display: inline-block; animation: pop .45s var(--ease-spring); }
+.medal { display: inline-block; animation: pop .6s var(--ease-spring) backwards, trophy-bounce 2.4s ease-in-out 1s infinite; }
+
+/* --- HERO / LOGIN --- */
+.anim-float { animation: float 4s ease-in-out infinite; }
+.hero-section::before { animation: drift 9s ease-in-out infinite; }
+.shake { animation: shake .45s ease-in-out; }
+
+/* --- SCORING --- */
+.question-card { border-left: 5px solid transparent !important; transition: border-color .3s, background-color .3s, transform .25s var(--ease-out), box-shadow .25s; }
+.question-card.is-correct { border-left-color: #198754 !important; background-color: rgba(25, 135, 84, .05); }
+.question-card.is-wrong   { border-left-color: #dc3545 !important; background-color: rgba(220, 53, 69, .05); }
+
+/* Locked question: answer buttons dimmed and frozen until unlocked */
+.question-card .answer-group { transition: opacity .25s, filter .25s; }
+.question-card.is-locked .answer-group { opacity: .5; filter: grayscale(.4); cursor: not-allowed; }
+.question-card.is-locked .answer-group .btn { pointer-events: none; }
+.lock-btn { width: 2.6rem; }
+
+/* --- CONFETTI CANVAS --- */
+#confetti-canvas { position: fixed; inset: 0; pointer-events: none; z-index: 10000; }
+
+/* --- ACCESSIBILITY: respect reduced-motion preference --- */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+    }
+}

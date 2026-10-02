@@ -4,9 +4,10 @@
 
 <style>
     /* Winner Styles (Only applied when no round is active) */
-    .rank-1 { background-color: #fffde7 !important; border-left: 8px solid #ffd700; } /* Gold */
-    .rank-2 { background-color: #f5f5f5 !important; border-left: 8px solid #c0c0c0; } /* Silver */
-    .rank-3 { background-color: #fff3e0 !important; border-left: 8px solid #cd7f32; } /* Bronze */
+    /* Bootstrap paints cell backgrounds from --bs-table-bg, so set it on the row */
+    .rank-1 { --bs-table-bg: #fffde7; border-left: 8px solid #ffd700; } /* Gold */
+    .rank-2 { --bs-table-bg: #f5f5f5; border-left: 8px solid #c0c0c0; } /* Silver */
+    .rank-3 { --bs-table-bg: #fff3e0; border-left: 8px solid #cd7f32; } /* Bronze */
     
     /* Make the top 3 rows pop a bit more */
     .rank-1 td, .rank-2 td, .rank-3 td {
@@ -14,11 +15,12 @@
     }
 </style>
 
-<div class="container mt-4">
+<!-- Refreshed in the background by animations.js (no full page reload) -->
+<div class="container mt-4" id="leaderboard-root" data-live-refresh="{{ 3000 if event else 10000 }}">
 
     {% if event %}
-        <h1 class="text-center fw-bold">{{ event.name }}</h1>
-        <h4 class="text-center text-muted mb-4">
+        <h1 class="text-center fw-bold anim-rise">{{ event.name }}</h1>
+        <h4 class="text-center text-muted mb-4 anim-rise" style="--delay: .1s;">
             {% if active_round %}
                 Current Stage: <span class="text-primary">{{ active_round.difficulty }}</span>
             {% else %}
@@ -26,7 +28,7 @@
             {% endif %}
         </h4>
     
-        <div class="card shadow">
+        <div class="card shadow anim-rise" style="--delay: .2s;">
             <div class="card-body p-0 table-responsive">
                 <table class="table table-striped table-hover mb-0 align-middle text-center">
                     <thead class="table-dark">
@@ -46,7 +48,7 @@
                             {% endif %}
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody data-stagger>
                         {% for rank in rankings %}
                         
                         <!-- Determine Row Class for Winners (Only if no active round) -->
@@ -58,15 +60,15 @@
                             {% endif %}
                         {% endif %}
 
-                        <tr class="{{ row_class }}">
+                        <tr class="flip-row {{ row_class }}" data-flip-key="{{ rank.name }}">
                             <!-- RANK COLUMN -->
                             <td class="fw-bold fs-5">
                                 {% if rank.is_competing %}
-                                    <span class="text-success fs-3">&bull;</span> <!-- Green Dot (Live) -->
+                                    <span class="live-dot" title="Competing"></span> <!-- Green Dot (Live) -->
                                 {% else %}
                                     {% if not active_round and loop.index <= 3 %}
                                         <!-- Medal Icons for Final Result -->
-                                        {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% endif %}
+                                        <span class="medal">{% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% endif %}</span>
                                     {% else %}
                                         #{{ loop.index }}
                                     {% endif %}
@@ -86,7 +88,7 @@
                             <!-- TOTAL (Hidden in Final Phase) -->
                             {% if not is_hybrid_final %}
                                 <td class="bg-warning bg-opacity-25 fw-bold fs-4">
-                                    {{ rank.total }}
+                                    <span class="score-value">{{ rank.total }}</span>
                                 </td>
                             {% endif %}
                         </tr>
@@ -99,20 +101,18 @@
                 </table>
             </div>
         </div>
-        <!-- Fast refresh when live -->
-        <meta http-equiv="refresh" content="3">
+        <noscript><meta http-equiv="refresh" content="3"></noscript>
 
     {% else %}
         <!-- NO EVENT ACTIVE STATE -->
-        <div class="alert alert-warning text-center shadow-sm p-5 mt-5" role="alert">
-            <h1 class="display-1 mb-3"><i class="fas fa-calendar-times text-warning"></i></h1>
+        <div class="alert alert-warning text-center shadow-sm p-5 mt-5 anim-rise" role="alert">
+            <h1 class="display-1 mb-3"><i class="fas fa-calendar-times text-warning anim-float d-inline-block"></i></h1>
             <h2 class="alert-heading fw-bold">No Active Event</h2>
             <p class="lead">There is currently no active Quiz Bee event being broadcasted.</p>
             <hr class="w-50 mx-auto my-4">
             <p class="mb-0 text-muted">Please check back later or contact the administrator.</p>
         </div>
-        <!-- Slower refresh when idle to save resources -->
-        <meta http-equiv="refresh" content="10">
+        <noscript><meta http-equiv="refresh" content="10"></noscript>
     {% endif %}
 
 </div>

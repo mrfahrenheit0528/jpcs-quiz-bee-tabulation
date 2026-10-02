@@ -2,10 +2,10 @@
 {% block title %}Scoring - {{ round.difficulty }}{% endblock %}
 
 {% block content %}
-<div class="container mb-5 mt-4">
+<div class="container mt-4">
     
     <!-- Header Info -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3 anim-rise">
         <div>
             <h2 class="mb-0">{{ school.name }}</h2>
             <span class="badge bg-secondary">{{ round.difficulty }} Round</span>
@@ -16,20 +16,38 @@
         </a>
     </div>
 
-    <form method="POST">
+    <!-- Answered Progress (updates live as questions are marked) -->
+    <div class="mb-4 anim-rise" style="--delay: .1s;">
+                <div class="d-flex justify-content-between align-items-center small text-muted mb-1">
+            <span>
+                Marked <strong id="answered-count">0</strong> / {{ total_questions }}
+            </span>
+            <button type="button" id="lock-all" class="btn btn-sm btn-outline-secondary py-0">
+                <i class="fas fa-lock me-1"></i> Lock all marked
+            </button>
+        </div>
+        <div class="progress" style="height: 8px;">
+            <div class="progress-bar bg-success" id="answered-bar" style="width: 0%;"></div>
+        </div>
+    </div>
+
+    <form method="POST" id="scoring-form">
         
         <!-- LIST LAYOUT (Single Column) -->
         <div class="row">
-            <div class="col-12">
+            <div class="col-12" data-stagger>
                 {% for q in range(1, total_questions+1) %}
-                <div class="card mb-3 shadow-sm border-0">
-                    <div class="card-body d-flex justify-content-between align-items-center p-3">
+                <div class="card mb-3 shadow-sm border-0 question-card
+                    {% if score_map.get(q) == True %}is-correct{% elif score_map.get(q) == False %}is-wrong{% endif %}">
+                    <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-2 p-3">
                         
                         <!-- LEFT SIDE: Question Number & Status -->
                         <div class="d-flex align-items-center">
                             <h5 class="mb-0 fw-bold me-3">Question #{{ q }}</h5>
+                            <span class="q-sync me-2 small" data-q="{{ q }}"></span>
                             
                             <!-- Visual indicator of current state -->
+                            <span class="q-status">
                             {% if score_map.get(q) == True %}
                                 <span class="badge bg-success"><i class="fas fa-check"></i> Correct</span>
                             {% elif score_map.get(q) == False %}
@@ -37,10 +55,16 @@
                             {% else %}
                                 <span class="badge bg-light text-dark border">Pending</span>
                             {% endif %}
+                            </span>
                         </div>
 
-                        <!-- RIGHT SIDE: Toggle Buttons (Parallel) -->
-                        <div class="btn-group" role="group" aria-label="Scoring toggle">
+                        <!-- RIGHT SIDE: Lock + Toggle Buttons (Parallel) -->
+                        <div class="d-flex align-items-center gap-2">
+                            <button type="button" class="btn btn-outline-secondary lock-btn" data-q="{{ q }}"
+                                    title="Lock this answer" aria-label="Lock question {{ q }}" aria-pressed="false">
+                                <i class="fas fa-lock-open"></i>
+                            </button>
+                        <div class="btn-group answer-group" role="group" aria-label="Scoring toggle">
                             
                             <!-- CORRECT BUTTON -->
                             <input type="radio" class="btn-check" name="question_{{ q }}" id="q{{ q }}_correct" value="correct"
@@ -55,7 +79,8 @@
                             <label class="btn btn-outline-danger fw-bold px-4" for="q{{ q }}_wrong">
                                 Wrong
                             </label>
-                        
+
+                        </div>
                         </div>
 
                     </div>
@@ -64,19 +89,224 @@
             </div>
         </div>
 
-        <!-- Floating Submit Button Area -->
-        <div class="fixed-bottom bg-white border-top p-3 shadow">
-            <div class="container">
-                <div class="d-grid gap-2">
-                    <button type="submit" class="btn btn-primary btn-lg fw-bold">
-                        <i class="fas fa-save me-2"></i> Confirm & Save Scores
-                    </button>
+        <!-- Save Status: sticks to the bottom while scrolling, then rests under the last question -->
+        <div class="sticky-bottom bg-white border rounded-top-4 px-3 py-2 shadow" id="save-bar">
+            <div>
+                <div id="save-status" class="text-center fw-bold py-2 text-success">
+                    <i class="fas fa-cloud me-2"></i> Answers save automatically
                 </div>
+                <noscript>
+                    <!-- Fallback when JavaScript is off: manual save -->
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg fw-bold">
+                            <i class="fas fa-save me-2"></i> Confirm & Save Scores
+                        </button>
+                    </div>
+                </noscript>
             </div>
         </div>
-        <!-- Spacing for the fixed bottom button -->
-        <div style="height: 80px;"></div>
+        
 
     </form>
 </div>
+
+<!-- Shown when the admin stops the round -->
+<div id="round-closed" class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+     style="background: rgba(44, 4, 4, .85); z-index: 2000;" hidden>
+    <div class="card shadow-lg p-4 text-center anim-pop" style="max-width: 420px;">
+        <i class="fas fa-lock fa-3x text-primary mb-3"></i>
+        <h4 class="fw-bold">Round Closed</h4>
+        <p class="text-muted mb-0" id="round-closed-msg">The admin has stopped this round.</p>
+        <p class="small text-muted mt-2 mb-0">Returning to the dashboard...</p>
+    </div>
+</div>
+
+<script>
+    // Answers auto-save the moment Correct/Wrong is tapped, and the page polls the round
+    // so it reacts when the admin stops it or adds a Sudden Death question.
+    document.addEventListener('DOMContentLoaded', function () {
+        const SAVE_URL = "{{ url_for('views.scoring_save', round_id=round.id) }}";
+        const STATUS_URL = "{{ url_for('views.scoring_status', round_id=round.id) }}";
+        const DASHBOARD_URL = "{{ url_for('views.tabulator_dashboard') }}";
+        const total = {{ total_questions }};
+        const badges = {
+            correct: '<span class="badge bg-success anim-pop"><i class="fas fa-check"></i> Correct</span>',
+            wrong: '<span class="badge bg-danger anim-pop"><i class="fas fa-times"></i> Wrong</span>'
+        };
+        const statusEl = document.getElementById('save-status');
+
+        const pending = new Map();   // question -> latest unsaved status
+        let inFlight = false;
+        let offline = false;
+        let stopped = false;
+        let retryTimer = null;
+
+        function setStatus(cls, icon, text) {
+            statusEl.className = 'text-center fw-bold py-2 ' + cls;
+            statusEl.innerHTML = '<i class="fas ' + icon + ' me-2"></i> ' + text;
+        }
+
+        function renderStatus() {
+            if (stopped) return;
+            if (offline) setStatus('text-danger', 'fa-wifi', 'Connection lost. Retrying... (' + pending.size + ' unsaved)');
+            else if (pending.size || inFlight) setStatus('text-secondary', 'fa-circle-notch fa-spin', 'Saving...');
+            else setStatus('text-success', 'fa-check-circle', 'All answers saved');
+        }
+
+        function setSync(q, state) {
+            const el = document.querySelector('.q-sync[data-q="' + q + '"]');
+            if (!el) return;
+            el.innerHTML = state === 'saving' ? '<i class="fas fa-circle-notch fa-spin text-secondary" title="Saving"></i>'
+                         : state === 'saved'  ? '<i class="fas fa-cloud-upload-alt text-success anim-pop" title="Saved"></i>'
+                         : '';
+        }
+
+        function updateProgress() {
+            const answered = document.querySelectorAll('.question-card input:checked').length;
+            document.getElementById('answered-count').textContent = answered;
+            document.getElementById('answered-bar').style.width = (total ? answered / total * 100 : 0) + '%';
+        }
+
+                // --- Per-question lock (remembered on this device, survives reloads) ---
+        const LOCK_KEY = 'jpcs-locks-round{{ round.id }}-school{{ school.id }}';
+        let locked = new Set();
+        try { locked = new Set(JSON.parse(localStorage.getItem(LOCK_KEY) || '[]')); } catch (err) {}
+
+        function saveLocks() {
+            try { localStorage.setItem(LOCK_KEY, JSON.stringify(Array.from(locked))); } catch (err) {}
+        }
+
+        function isAnswered(q) {
+            return !!document.querySelector('input[name="question_' + q + '"]:checked');
+        }
+
+        function applyLock(q, animate) {
+            const btn = document.querySelector('.lock-btn[data-q="' + q + '"]');
+            const card = btn.closest('.question-card');
+            const isLocked = locked.has(q);
+            card.classList.toggle('is-locked', isLocked);
+            card.querySelectorAll('.answer-group input').forEach(function (i) { i.disabled = isLocked || stopped; });
+            btn.classList.toggle('btn-secondary', isLocked);
+            btn.classList.toggle('btn-outline-secondary', !isLocked);
+            btn.setAttribute('aria-pressed', isLocked);
+            btn.title = isLocked ? 'Unlock to change this answer' : 'Lock this answer';
+            btn.disabled = stopped || (!isLocked && !isAnswered(q));   // nothing to lock until marked
+            btn.innerHTML = '<i class="fas ' + (isLocked ? 'fa-lock' : 'fa-lock-open') + (animate ? ' anim-pop' : '') + '"></i>';
+        }
+
+        function setLock(q, value) {
+            value ? locked.add(q) : locked.delete(q);
+            saveLocks();
+            applyLock(q, true);
+        }
+
+        document.querySelectorAll('.lock-btn').forEach(function (btn) {
+            const q = parseInt(btn.dataset.q, 10);
+            btn.addEventListener('click', function () { setLock(q, !locked.has(q)); });
+            // Tapping a locked answer nudges the lock instead of changing the score
+            btn.closest('.question-card').querySelector('.answer-group').addEventListener('click', function () {
+                if (!locked.has(q) || stopped) return;
+                btn.classList.remove('shake');
+                void btn.offsetWidth;   // restart the animation
+                btn.classList.add('shake');
+            });
+            applyLock(q, false);
+        });
+
+        document.getElementById('lock-all').addEventListener('click', function () {
+            for (let q = 1; q <= total; q++) {
+                if (isAnswered(q) && !locked.has(q)) setLock(q, true);
+            }
+        });
+
+        function roundClosed(message) {
+            if (stopped) return;
+            stopped = true;
+            pending.clear();
+            document.querySelectorAll('#scoring-form input, #scoring-form button').forEach(function (i) { i.disabled = true; });
+            if (message) document.getElementById('round-closed-msg').textContent = message;
+            document.getElementById('round-closed').hidden = false;
+            setTimeout(function () { window.location.href = DASHBOARD_URL; }, 3000);
+        }
+
+        async function flush() {
+            if (inFlight || stopped || !pending.size) { renderStatus(); return; }
+            inFlight = true;
+            renderStatus();
+            const [q, status] = pending.entries().next().value;
+            try {
+                const res = await fetch(SAVE_URL, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question: q, status: status })
+                });
+                // A redirect to the login page means the session expired
+                if (res.redirected || !(res.headers.get('Content-Type') || '').includes('json')) {
+                    window.location.reload();
+                    return;
+                }
+                const data = await res.json();
+                if (res.status === 409 && data.closed) { roundClosed(data.error); return; }
+                if (res.status >= 400 && res.status < 500) { pending.clear(); window.location.reload(); return; } // out of sync: resync
+                if (!res.ok) throw new Error(data.error || res.status);
+
+                // Only clear if the tabulator didn't change the answer while it was saving
+                if (pending.get(q) === status) {
+                    pending.delete(q);
+                    setSync(q, 'saved');
+                }
+                offline = false;
+            } catch (err) {
+                offline = true;
+                inFlight = false;
+                renderStatus();
+                if (!retryTimer) retryTimer = setTimeout(function () { retryTimer = null; flush(); }, 2000);
+                return;
+            }
+            inFlight = false;
+            flush();
+        }
+
+        document.querySelectorAll('.question-card input[type=radio]').forEach(function (input) {
+            input.addEventListener('change', function () {
+                const card = input.closest('.question-card');
+                const q = parseInt(input.name.replace('question_', ''), 10);
+                card.classList.toggle('is-correct', input.value === 'correct');
+                card.classList.toggle('is-wrong', input.value === 'wrong');
+                card.querySelector('.q-status').innerHTML = badges[input.value];
+                updateProgress();
+
+                                pending.set(q, input.value);
+                setSync(q, 'saving');
+                applyLock(q, false);
+                flush();
+            });
+        });
+
+        // Poll the round: closed by admin, or Sudden Death (+1 Q) added
+        setInterval(async function () {
+            if (stopped) return;
+            try {
+                const res = await fetch(STATUS_URL, { cache: 'no-store', credentials: 'same-origin' });
+                if (!res.ok || res.redirected) return;
+                const data = await res.json();
+                if (!data.open) roundClosed(data.message);
+                else if (data.total_questions !== total && !pending.size && !inFlight) window.location.reload();
+            } catch (err) {
+                // Offline: the save loop already shows the warning
+            }
+        }, 3000);
+
+        // Warn before leaving with unsaved answers
+        window.addEventListener('beforeunload', function (e) {
+            if (pending.size && !stopped) { e.preventDefault(); e.returnValue = ''; }
+        });
+
+        // Auto-save replaces the manual submit (kept only as a no-JS fallback)
+        document.getElementById('scoring-form').addEventListener('submit', function (e) { e.preventDefault(); });
+
+        updateProgress();
+    });
+</script>
 {% endblock %}

@@ -358,6 +358,25 @@ def delete_school(school_id):
     flash('School removed.', category='success')
     return redirect(url_for('views.school_registration', event_id=event_id))
 
+def next_round_number(event_id):
+    # Tie breakers/clinchers share their parent's number, so the next slot is max + 1
+    highest = db.session.query(db.func.max(Round.number)).filter_by(event_id=event_id).scalar()
+    return (highest or 0) + 1
+
+def parse_round_numbers(form):
+    """Validate the numeric round fields. Returns (values, error_message)."""
+    try:
+        points = int(form.get('points', ''))
+        total_questions = int(form.get('total_questions', ''))
+        qualifying_count = int(form.get('qualifying_count') or 0)
+    except ValueError:
+        return None, 'Points, questions, and qualifiers must be whole numbers.'
+    if points < 1 or total_questions < 1:
+        return None, 'Points and total questions must be at least 1.'
+    if qualifying_count < 0:
+        return None, 'Qualifiers cannot be negative.'
+    return (points, total_questions, qualifying_count), None
+
 @views.route('/admin/round-setup/<int:event_id>', methods=['GET', 'POST'])
 @login_required
 def round_setup(event_id):
@@ -366,19 +385,26 @@ def round_setup(event_id):
 
     if request.method == 'POST':
         difficulty = request.form.get('difficulty')
-        points = request.form.get('points')
-        total_questions = request.form.get('total_questions')
-        round_number = request.form.get('round_number')
-        qualifying_count = request.form.get('qualifying_count')
         is_final = request.form.get('is_final') == 'on'
+
+        expected_number = next_round_number(event.id)
+        if request.form.get('round_number') != str(expected_number):
+            flash(f'Round order must be {expected_number} (the next round in sequence).', category='error')
+            return redirect(url_for('views.round_setup', event_id=event.id))
+
+        values, error = parse_round_numbers(request.form)
+        if error:
+            flash(error, category='error')
+            return redirect(url_for('views.round_setup', event_id=event.id))
+        points, total_questions, qualifying_count = values
 
         new_round = Round(
             event_id=event.id,
-            number=round_number,
+            number=expected_number,
             difficulty=difficulty,
             points=points,
             total_questions=total_questions,
-            qualifying_count=int(qualifying_count) if qualifying_count else 0,
+            qualifying_count=qualifying_count,
             is_final=is_final
         )
         db.session.add(new_round)
@@ -387,7 +413,8 @@ def round_setup(event_id):
         return redirect(url_for('views.round_setup', event_id=event.id))
 
     rounds = Round.query.filter_by(event_id=event.id).order_by(Round.number.asc()).all()
-    return render_template('admin/round_setup.html', event=event, rounds=rounds)
+    return render_template('admin/round_setup.html', event=event, rounds=rounds,
+                           next_number=next_round_number(event.id))
 
 @views.route('/admin/round/edit/<int:round_id>', methods=['POST'])
 @login_required
@@ -395,12 +422,14 @@ def edit_round(round_id):
     if current_user.role != 'admin': return "Unauthorized", 403
     round_obj = Round.query.get_or_404(round_id)
     
-    round_obj.number = request.form.get('round_number')
+    values, error = parse_round_numbers(request.form)
+    if error:
+        flash(error, category='error')
+        return redirect(url_for('views.round_setup', event_id=round_obj.event_id))
+
+    # Order # is fixed once created; delete rounds to change the sequence
     round_obj.difficulty = request.form.get('difficulty')
-    round_obj.points = request.form.get('points')
-    round_obj.total_questions = request.form.get('total_questions')
-    q_count = request.form.get('qualifying_count')
-    round_obj.qualifying_count = int(q_count) if q_count else 0
+    round_obj.points, round_obj.total_questions, round_obj.qualifying_count = values
     round_obj.is_final = request.form.get('is_final') == 'on'
     
     db.session.commit()
@@ -413,7 +442,15 @@ def delete_round(round_id):
     if current_user.role != 'admin': return "Unauthorized", 403
     round_obj = Round.query.get_or_404(round_id)
     event_id = round_obj.event_id
+    number = round_obj.number
     db.session.delete(round_obj)
+    db.session.flush()
+
+    # Close the gap so the order stays 1, 2, 3... (skip if tie breakers still use this number)
+    if not Round.query.filter_by(event_id=event_id, number=number).first():
+        for later in Round.query.filter(Round.event_id == event_id, Round.number > number).all():
+            later.number -= 1
+
     db.session.commit()
     flash('Round deleted.', category='success')
     return redirect(url_for('views.round_setup', event_id=event_id))
@@ -1139,37 +1176,44 @@ def tabulator_dashboard():
         rounds = active_event.rounds
     return render_template('tabulator/tabulator_dashboard.html', school=school, active_event=active_event, rounds=rounds)
 
+def scoring_access(current_round):
+    """Shared checks for the tabulator scoring routes.
+    Returns (school, None) when allowed, or (None, (message, category)) when not."""
+    if not current_round.is_active:
+        return None, (f'The {current_round.difficulty} Round is currently closed.', 'error')
+    school = School.query.filter_by(event_id=current_round.event_id, user_id=current_user.id).first()
+    if not school:
+        return None, ("You are not assigned to any school for this specific event.", 'error')
+    if not current_round.is_school_allowed(school.id):
+        return None, ("Your school is not participating in this specific round.", 'warning')
+    return school, None
+
+def save_answer(school, current_round, q_num, is_correct_val):
+    existing_score = Score.query.filter_by(
+        school_id=school.id, round_id=current_round.id, question_number=q_num).first()
+    if existing_score: existing_score.is_correct = is_correct_val
+    else:
+        new_score = Score(school_id=school.id, round_id=current_round.id,
+                          question_number=q_num, is_correct=is_correct_val)
+        db.session.add(new_score)
+
 @views.route('/tabulator/scoring/<int:round_id>', methods=['GET', 'POST'])
 @login_required
 def scoring(round_id):
     if current_user.role != 'tabulator': return "Unauthorized", 403
     current_round = Round.query.get_or_404(round_id)
-    
-    if not current_round.is_active:
-        flash(f'The {current_round.difficulty} Round is currently closed.', category='error')
+
+    school, denied = scoring_access(current_round)
+    if denied:
+        flash(*denied)
         return redirect(url_for('views.tabulator_dashboard'))
 
-    school = School.query.filter_by(event_id=current_round.event_id, user_id=current_user.id).first()
-    if not school:
-        flash("You are not assigned to any school for this specific event.", category='error')
-        return redirect(url_for('views.tabulator_dashboard'))
-
-    if not current_round.is_school_allowed(school.id):
-        flash("Your school is not participating in this specific round.", category='warning')
-        return redirect(url_for('views.tabulator_dashboard'))
-
+    # Fallback for full-form submits (the page normally auto-saves via scoring_save)
     if request.method == 'POST':
         for q_num in range(1, current_round.total_questions + 1):
             answer_status = request.form.get(f'question_{q_num}')
             if answer_status:
-                is_correct_val = (answer_status == 'correct')
-                existing_score = Score.query.filter_by(
-                    school_id=school.id, round_id=current_round.id, question_number=q_num).first()
-                if existing_score: existing_score.is_correct = is_correct_val
-                else:
-                    new_score = Score(school_id=school.id, round_id=current_round.id, 
-                                      question_number=q_num, is_correct=is_correct_val)
-                    db.session.add(new_score)
+                save_answer(school, current_round, q_num, answer_status == 'correct')
         db.session.commit()
         flash('Scores saved successfully!', category='success')
         return redirect(url_for('views.scoring', round_id=current_round.id))
@@ -1178,3 +1222,34 @@ def scoring(round_id):
     score_map = {s.question_number: s.is_correct for s in existing_scores}
     return render_template('tabulator/scoring.html', school=school, round=current_round, 
                            total_questions=current_round.total_questions, score_map=score_map)
+
+@views.route('/tabulator/scoring/<int:round_id>/save', methods=['POST'])
+@login_required
+def scoring_save(round_id):
+    """Auto-save a single answer the moment the tabulator taps Correct/Wrong."""
+    if current_user.role != 'tabulator': return jsonify(error='Unauthorized'), 403
+    current_round = Round.query.get_or_404(round_id)
+
+    school, denied = scoring_access(current_round)
+    if denied:
+        return jsonify(error=denied[0], closed=True), 409
+
+    data = request.get_json(silent=True) or {}
+    q_num, status = data.get('question'), data.get('status')
+    if not isinstance(q_num, int) or not 1 <= q_num <= current_round.total_questions or status not in ('correct', 'wrong'):
+        return jsonify(error='Invalid answer.'), 400
+
+    save_answer(school, current_round, q_num, status == 'correct')
+    db.session.commit()
+    return jsonify(ok=True)
+
+@views.route('/tabulator/scoring/<int:round_id>/status')
+@login_required
+def scoring_status(round_id):
+    """Polled by the scoring page to notice a stopped round or a Sudden Death question."""
+    if current_user.role != 'tabulator': return jsonify(error='Unauthorized'), 403
+    current_round = Round.query.get_or_404(round_id)
+    school, denied = scoring_access(current_round)
+    return jsonify(open=denied is None,
+                   message=denied[0] if denied else None,
+                   total_questions=current_round.total_questions)

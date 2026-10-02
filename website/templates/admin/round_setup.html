@@ -28,8 +28,8 @@
                         <!-- Order -->
                         <div class="mb-3">
                             <label class="form-label fw-bold">Order #</label>
-                            <input type="number" name="round_number" class="form-control" placeholder="e.g. 1" required>
-                            <div class="form-text">1=First round, 2=Second...</div>
+                            <input type="number" name="round_number" class="form-control bg-light" value="{{ next_number }}" readonly>
+                            <div class="form-text">Assigned automatically: rounds are numbered in sequence.</div>
                         </div>
 
                         <!-- Difficulty Name -->
@@ -49,7 +49,7 @@
                             <label class="form-label fw-bold">Points per Question</label>
                             <div class="input-group">
                                 <span class="input-group-text">Pts</span>
-                                <input type="number" name="points" class="form-control" placeholder="e.g. 5" required>
+                                <input type="number" name="points" class="form-control" placeholder="e.g. 5" min="1" step="1" required>
                             </div>
                         </div>
 
@@ -58,14 +58,14 @@
                             <label class="form-label fw-bold">Total Questions</label>
                             <div class="input-group">
                                 <span class="input-group-text">Qty</span>
-                                <input type="number" name="total_questions" class="form-control" placeholder="e.g. 10" required>
+                                <input type="number" name="total_questions" class="form-control" placeholder="e.g. 10" min="1" step="1" required>
                             </div>
                         </div>
                         
                         <!-- Qualifiers -->
                         <div class="mb-3">
                             <label class="form-label fw-bold">Qualifiers (Advance)</label>
-                            <input type="number" name="qualifying_count" class="form-control" placeholder="e.g. 10 (0 = All)">
+                            <input type="number" name="qualifying_count" class="form-control" placeholder="e.g. 10 (0 = All)" min="0" step="1">
                             <div class="form-text">Top N schools to advance.</div>
                         </div>
 
@@ -141,7 +141,8 @@
                                                 <div class="row g-2 mb-3">
                                                     <div class="col-4">
                                                         <label class="form-label">Order #</label>
-                                                        <input type="number" name="round_number" class="form-control" value="{{ round.number }}" required>
+                                                        <input type="number" class="form-control bg-light" value="{{ round.number }}" readonly
+                                                               title="Order is fixed. Delete rounds to change the sequence.">
                                                     </div>
                                                     <div class="col-8">
                                                         <label class="form-label">Round Name</label>
@@ -152,17 +153,17 @@
                                                 <div class="row g-2 mb-3">
                                                     <div class="col-6">
                                                         <label class="form-label">Points</label>
-                                                        <input type="number" name="points" class="form-control" value="{{ round.points }}" required>
+                                                        <input type="number" name="points" class="form-control" value="{{ round.points }}" min="1" step="1" required>
                                                     </div>
                                                     <div class="col-6">
                                                         <label class="form-label">Items</label>
-                                                        <input type="number" name="total_questions" class="form-control" value="{{ round.total_questions }}" required>
+                                                        <input type="number" name="total_questions" class="form-control" value="{{ round.total_questions }}" min="1" step="1" required>
                                                     </div>
                                                 </div>
 
                                                 <div class="mb-3">
                                                     <label class="form-label">Qualifiers (Advancing)</label>
-                                                    <input type="number" name="qualifying_count" class="form-control" value="{{ round.qualifying_count }}">
+                                                    <input type="number" name="qualifying_count" class="form-control" value="{{ round.qualifying_count }}" min="0" step="1">
                                                 </div>
 
                                                 <div class="form-check">

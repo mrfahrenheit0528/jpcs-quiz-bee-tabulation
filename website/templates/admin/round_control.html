@@ -2,17 +2,18 @@
 {% block title %}Live Round Control{% endblock %}
 
 {% block content %}
-<div class="container mt-4 mb-5">
+<!-- Refreshed in the background by animations.js as tabulators enter scores -->
+<div class="container mt-4 mb-5" id="round-control-root" data-live-refresh="2000">
     <div class="row">
         <!-- LEFT PANEL: Mission Control -->
         <div class="col-md-4 border-end">
             <h3 class="mb-3">Mission Control</h3>
             <h5 class="text-muted">Event: <strong>{{ event.name }}</strong></h5>
             <hr>
-            <div class="list-group mb-4">
+            <div class="list-group mb-4 list-hover" data-stagger>
                 {% for round in rounds %}
                 <div class="list-group-item d-flex justify-content-between align-items-center 
-                    {% if round.is_active %}bg-primary text-white{% endif %}">
+                    {% if round.is_active %}bg-primary text-white glow-active{% endif %}">
                     <div>
                         <h5 class="mb-0">{{ round.difficulty }}</h5>
                         <small class="{% if round.is_active %}text-white-50{% else %}text-muted{% endif %}">
@@ -68,10 +69,10 @@
         <!-- RIGHT PANEL: Live Scoreboard -->
         <div class="col-md-8">
             {% if active_round %}
-                <div class="card border-primary shadow-sm mb-4">
+                <div class="card border-primary shadow-sm mb-4 anim-rise">
                     <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                         <div class="d-flex align-items-center gap-2">
-                            <h4 class="mb-0">🔴 LIVE: {{ active_round.difficulty }}</h4>
+                            <h4 class="mb-0"><span class="live-dot live-dot-light me-2"></span>LIVE: {{ active_round.difficulty }}</h4>
                             
                             <!-- Explicitly show the cutoff rule -->
                             {% if active_round.qualifying_count > 0 and 'Clincher' not in active_round.difficulty %}
@@ -87,7 +88,9 @@
                                 </span>
                             {% endif %}
                         </div>
-                        <button type="button" onclick="location.reload()" class="btn btn-sm btn-light">Refresh Stats ⟳</button>
+                        <span class="badge bg-light text-success border rounded-pill" title="Scores update automatically">
+                            <span class="live-dot me-1" style="width: .5rem; height: .5rem;"></span> Auto-updating
+                        </span>
                     </div>
                     <div class="card-body table-responsive">
                         <table class="table table-hover align-middle text-center">
@@ -106,7 +109,7 @@
                                     </th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody data-stagger>
                                 {% for stat in live_scores %}
                                     <!-- COLOR CODING LOGIC -->
                                     {% set row_class = "" %}
@@ -126,7 +129,7 @@
                                         {% endif %}
                                     {% endif %}
 
-                                <tr class="{{ row_class }}">
+                                <tr class="flip-row {{ row_class }}" data-flip-key="{{ stat.school_id }}">
                                     <td class="fw-bold text-muted">{{ loop.index }}</td>
                                     <td class="text-start fw-bold">
                                         {{ stat.school }}
@@ -144,7 +147,7 @@
                                         </div>
                                     </td>
                                     <!-- Display the calculated score (Cumulative or Current) -->
-                                    <td class="fw-bold fs-5">{{ stat.display_score }}</td>
+                                    <td class="fw-bold fs-5"><span class="score-value">{{ stat.display_score }}</span></td>
                                 </tr>
                                 {% else %}
                                 <tr><td colspan="4" class="text-muted py-4">No data yet.</td></tr>
@@ -154,7 +157,7 @@
                     </div>
                 </div>
             {% else %}
-                <div class="alert alert-secondary text-center mb-4 p-5">
+                <div class="alert alert-secondary text-center mb-4 p-5 anim-rise">
                     <h4>No Round Active</h4>
                     <p>Select a round on the left and click START.</p>
                 </div>

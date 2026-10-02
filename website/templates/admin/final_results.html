@@ -16,7 +16,7 @@
     </div>
 
     <!-- Result Paper UI -->
-    <div class="card shadow-lg border-0" style="min-height: 800px;">
+    <div class="card shadow-lg border-0 anim-rise" style="min-height: 800px;" data-confetti>
         <div class="card-body p-5">
             
             <!-- Header -->
@@ -44,13 +44,13 @@
                             <th class="py-3" style="width: 150px;">Final Score</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody data-stagger>
                         {% for rank in rankings %}
                         <tr class="{% if loop.index == 1 %}bg-warning bg-opacity-10{% endif %}">
                             <!-- Rank Column -->
                             <td class="fw-bold fs-4 py-3">
                                 {% if loop.index == 1 %}
-                                    <i class="fas fa-trophy text-warning me-1"></i> 1st
+                                    <i class="fas fa-trophy text-warning me-1 medal"></i> 1st
                                 {% elif loop.index == 2 %}
                                     <span class="text-secondary">🥈 2nd</span>
                                 {% elif loop.index == 3 %}
@@ -68,7 +68,7 @@
                             <!-- Score Column -->
                             <td class="fw-bold fs-4 py-3 text-dark">
                                 {% if rank.has_final %}
-                                    {{ rank.final_score }}
+                                    <span data-count-up>{{ rank.final_score }}</span>
                                 {% else %}
                                     <span class="text-muted fs-6">Did not qualify</span>
                                 {% endif %}
