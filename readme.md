@@ -79,7 +79,11 @@ The app will run at **[http://127.0.0.1:5000](http://127.0.0.1:5000)**.
 
 ### 1. **Admin (Mission Control)**
 
-* Login via `/login` (Role: Admin)
+* Login via `/login`.
+(Username:
+```admin1```
+Password:
+```adminpass```)
 * Create Event → Choose **Hybrid**
 * Define rounds (Easy/Average/Difficult/Final)
 * Set number of qualifiers
@@ -97,22 +101,16 @@ The app will run at **[http://127.0.0.1:5000](http://127.0.0.1:5000)**.
 * Open `/leaderboard`
 * Auto-refreshes every 3–5 seconds
 
----
-
-## System Screenshots
-
-*(Insert Mission Control, Scoring Page, Leaderboard images here)*
 
 ---
 
 ## Credits & Acknowledgements
 
 **Developed By:**
-Guiller Angelo Hermoso – Director for Projects 2025
+Guiller Angelo Hermoso
 
 **Powered By:**
 Junior Philippine Computer Society – CSPC Chapter
-*“Excellence in Technology, Leadership in Action.”*
 
 ---
 
@@ -120,4 +118,3 @@ Junior Philippine Computer Society – CSPC Chapter
 
 This project is proprietary software developed for JPCS-CSPC.
 
-```
