@@ -1,61 +1,106 @@
-# Quiz Bee Tabulation System  
-**Automated Tournament Logic Engine for Academic Competitions**
+# Quiz Bee Tabulation System
 
-A specialized, enterprise-grade tabulation system designed to handle complex academic competition rules, including Hybrid Scoring (Cumulative + Clean Slate), Recursive Tie-Breaking, and Real-time Leaderboards.  
-Built for the **Junior Philippine Computer Society – CSPC Chapter**.
+A web-based tabulation system developed for the **Junior Philippine Computer Society – CSPC Chapter** to automate scoring, qualification, tie-breaking, live rankings, and official result generation for academic quiz bee competitions.
+
+The system supports multiple competition formats, including cumulative scoring, clean-slate final rounds, and recursive clincher rounds for unresolved ties.
+
+---
+
+## Project Explanation
+
+The Quiz Bee Tabulation System was designed to reduce manual score computation during academic competitions.
+
+It provides a centralized platform where administrators can manage events and rounds, tabulators can record scores, and viewers can monitor live rankings. The system also automatically handles qualification rules, tie detection, clincher rounds, and final placements.
 
 ---
 
 ## Key Features
 
 ### Advanced Scoring Engine
-- **Hybrid Logic:** Automatically switches between Cumulative Scoring (eliminations) and Back-to-Zero/Clean Slate (final round).  
-- **Flexible Configuration:** Supports strict "Cumulative" or simple "Per Round" modes.
+- **Hybrid Scoring:** Supports cumulative scoring during elimination rounds and clean-slate scoring during finals.
+- **Flexible Configuration:** Can also use cumulative-only or per-round scoring modes.
 
-### Iterative & Recursive Tie-Breaking
-- **Smart Detection:** Detects ties at qualifying cutoffs (e.g., 3 schools tied for the last slot).  
-- **Recursive Clincher Rounds:** If tied again, the system auto-creates Clincher 2, 3, etc.  
-- **Strict Final Ranking:** Enforces Gold–Silver–Bronze by forcing tie-breakers until all positions are unique.
+### Recursive Tie-Breaking
+- Detects ties at qualification cutoffs and ranking positions.
+- Automatically supports additional clincher rounds when ties remain unresolved.
+- Helps ensure unique final placements for winning teams.
 
 ### Role-Based Dashboards
-- **Admin Mission Control:** Real-time monitor, round lock/unlock, and instant “Sudden Death” (+1 Q).  
-- **Tabulator Panel:** Secure parallel scoring interface for rapid data entry.  
-- **Live Leaderboard:** Auto-updates, hides cumulative info in finals, highlights active teams and winners.
+- **Admin Dashboard:** Manage events, rounds, participants, scoring rules, and live competition controls.
+- **Tabulator Panel:** Provides a focused interface for recording participant scores.
+- **Live Leaderboard:** Displays automatically updated rankings for viewers.
 
 ### Official Reporting
-- **Automated PDF Generation** using FPDF.  
-- **Dynamic Layout:** Adjusts automatically based on rounds played.  
-- **Digital Signatories:** Auto-generated blocks for Tabulators and Head Admin.
+- Generates competition result reports in PDF format using FPDF.
+- Adjusts report layouts according to the rounds completed.
+- Includes signatory sections for authorized competition personnel.
+
+---
+
+## Methodology
+
+The system was developed by translating the competition's scoring and qualification rules into automated application logic.
+
+The workflow follows four main stages:
+
+1. **Event Configuration** — administrators create the competition, rounds, participants, and scoring rules.
+2. **Score Entry** — tabulators record participant answers during active rounds.
+3. **Automated Evaluation** — the system calculates scores, rankings, qualification results, and detects ties.
+4. **Result Generation** — final rankings are displayed through the leaderboard and can be exported as official PDF reports.
+
+---
+
+## Results
+
+The completed system can manage an end-to-end quiz bee competition, including:
+
+- Multi-round scoring
+- Automatic score calculation
+- Qualification of teams
+- Clean-slate final rounds
+- Tie detection and clincher rounds
+- Live leaderboard updates
+- Final ranking
+- PDF result generation
+
+This reduces the need for manual tabulation and helps provide a more consistent and organized competition workflow.
 
 ---
 
 ## Tech Stack
 
 **Backend:** Python, Flask, SQLAlchemy  
-**Database:** SQLite (Development)  
+**Database:** SQLite  
 **Frontend:** HTML5, CSS3, Bootstrap 5, Jinja2  
 **PDF Engine:** FPDF  
-**Icons:** FontAwesome  
+**Icons:** Font Awesome  
 
 ---
 
 ## Installation & Setup
 
 ### 1. Clone the Repository
+
 ```bash
-git clone https://github.com/your-username/jpcs-quiz-bee-tabulation.git
+git clone https://github.com/mrfahrenheit0528/jpcs-quiz-bee-tabulation.git
 cd jpcs-quiz-bee-tabulation
-````
+```
 
 ### 2. Create a Virtual Environment
 
 ```bash
 python -m venv .venv
+```
 
-# Windows
+**Windows**
+
+```bash
 .venv\Scripts\activate
+```
 
-# Mac/Linux
+**macOS/Linux**
+
+```bash
 source .venv/bin/activate
 ```
 
@@ -71,50 +116,48 @@ pip install -r requirements.txt
 python main.py
 ```
 
-The app will run at **[http://127.0.0.1:5000](http://127.0.0.1:5000)**.
+The application will run at:
+
+```text
+http://127.0.0.1:5000
+```
 
 ---
 
 ## User Guide
 
-### 1. **Admin (Mission Control)**
+### Admin
 
-* Login via `/login`.
-(Username:
-```admin1```
-Password:
-```adminpass```)
-* Create Event → Choose **Hybrid**
-* Define rounds (Easy/Average/Difficult/Final)
-* Set number of qualifiers
-* Register schools + assign Tabulator accounts
-* Use **Live Round Control** to start rounds and evaluate scores
+- Log in through `/login` (`admin1`, `adminpass` if seed.py used)
+- Create and configure an event
+- Define competition rounds
+- Set the number of qualifiers
+- Register participating schools
+- Assign tabulator accounts
+- Start and manage active rounds
+- Evaluate scores and rankings
 
-### 2. **Tabulator (Data Entry)**
+### Tabulator
 
-* Login with assigned credentials
-* Wait for Admin to start the round
-* Enter scoring (Correct/Wrong toggles)
+- Log in using the assigned account
+- Wait for the administrator to activate a round
+- Record correct and incorrect answers through the scoring interface
 
-### 3. **Viewer (Audience)**
+### Viewer
 
-* Open `/leaderboard`
-* Auto-refreshes every 3–5 seconds
-
+- Open `/leaderboard`
+- View automatically refreshed competition standings
 
 ---
 
-## Credits & Acknowledgements
+## Developer
 
-**Developed By:**
-Guiller Angelo Hermoso
+**Guiller Angelo Hermoso**
 
-**Powered By:**
-Junior Philippine Computer Society – CSPC Chapter
+Developed for the **Junior Philippine Computer Society – CSPC Chapter**.
 
 ---
 
 ## License
 
-This project is proprietary software developed for JPCS-CSPC.
-
+This project is proprietary software developed for **JPCS-CSPC Chapter**.
