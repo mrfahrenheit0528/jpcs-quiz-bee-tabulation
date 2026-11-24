@@ -7,6 +7,109 @@ use a browser.
 LAN access must be configured on each new host. The IP address and firewall rule
 from the previous PC do not carry over.
 
+## Windows quick start: Python setup without Docker
+
+Follow this section to run the system on a new Windows PC using the same native
+Python setup as the current preview. Docker is not required for these steps.
+
+### 1. Install Python and copy the project
+
+Install Python 3.13 and select **Add Python to PATH** during installation. Copy or
+clone the updated project onto the new PC. Do not copy the old PC's `.venv` folder;
+the next step creates a new one.
+
+Open the project folder in File Explorer, type `powershell` in the address bar,
+and press Enter. All following commands must run from the project folder.
+
+### 2. Install the project dependencies
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pip install pytest
+```
+
+### 3. Identify the Windows PC's network address
+
+Connect the PC to your trusted event router, then run:
+
+```powershell
+Get-NetIPConfiguration
+Get-NetConnectionProfile
+```
+
+Find the connected Ethernet or Wi-Fi adapter with a default gateway. Note its IPv4
+address and interface alias. The commands below use **192.168.1.100** and **Wi-Fi**
+as examples. Replace both with the new PC's actual values. For a wired connection,
+the alias may be `Ethernet`.
+
+### 4. Configure the Windows firewall
+
+Open **PowerShell as Administrator** and change to the project folder. For example,
+if you copied the project to `C:\QuizBee`:
+
+```powershell
+Set-Location 'C:\QuizBee'
+```
+
+On your trusted event network, set the selected adapter's network profile to
+Private and allow the preview port:
+
+```powershell
+Set-NetConnectionProfile -InterfaceAlias 'Wi-Fi' -NetworkCategory Private
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Enable-PreviewLan.ps1 -Port 5059 -Interface 'Wi-Fi'
+```
+
+This creates a scoped inbound firewall exception for TCP port 5059. Windows
+Firewall stays enabled. You can close this administrator window afterward.
+
+### 5. Start the server in regular PowerShell
+
+Choose one of the following commands.
+
+**Resume your existing participants, rounds, accounts, and scores:**
+
+First transfer a consistent backup of the demo database to
+`tmp\siklab-demo-preserved.db` on the new PC. The transfer procedure is under
+**Option B, step 6** below. The `tmp` folder is ignored by Git, so cloning the
+project alone does not copy this database.
+
+```powershell
+.\.venv\Scripts\python.exe scripts\serve_fixture.py --database tmp\siklab-demo-preserved.db --lan-ip 192.168.1.100 --port 5059
+```
+
+**Start a disposable rehearsal with sample participants:**
+
+```powershell
+.\.venv\Scripts\python.exe scripts\serve_fixture.py --lan-ip 192.168.1.100 --port 5059
+```
+
+The disposable rehearsal uses `admin1` and `tab1` through `tab15`, all with password
+`test-password`. Its temporary data is discarded when the fixture is cleaned up.
+An existing database keeps its existing accounts and passwords.
+
+**Keep the server terminal open and the host awake.** Press Ctrl+C to stop it.
+To resume a transferred database later, rerun the same `--database` command. If the
+host IP changes, substitute its new address. Do not run `seed.py` on event data.
+
+### 6. Connect the tabulator devices
+
+Connect phones, tablets, and other laptops to the same LAN. With the example IP:
+
+| Page | Address |
+| --- | --- |
+| Home and login | `http://192.168.1.100:5059` |
+| Original leaderboard | `http://192.168.1.100:5059/leaderboard` |
+| Projection leaderboard | `http://192.168.1.100:5059/siklab` |
+
+Log in as an administrator, open **Connect Tabulators**, and scan the direct-IP QR
+from another device. This Python setup does not publish `jpcs-quiz.local`.
+
+Test the address from a separate phone or tablet before the event. If it works on
+the host but fails on another device, check the IP, Private firewall profile, and
+router guest-network/client-isolation settings. Tabulator devices need only a
+browser; they do not need Python or Docker installed.
+
 ## Choose a setup
 
 | Setup | Use it for | Default port | Connection method |
