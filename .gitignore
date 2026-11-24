@@ -3,3 +3,5 @@ website/__pycache__/
 .vscode/
 .vscode/settings.json
 email.html
+instance/database.db
+instance/database.db
