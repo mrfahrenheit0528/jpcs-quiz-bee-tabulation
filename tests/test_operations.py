@@ -135,3 +135,22 @@ def test_offline_assets_and_network(app,admin,tmp_path):
     assert admin.get('/admin/connection').json['direct_url']=='http://192.168.10.12:5000'
     assert admin.get('/admin/generate-qr?target=ip').mimetype=='image/png'
     assert app.test_client().get('/healthz').json=={'status':'ok'}
+
+
+def test_lan_preview_uses_actual_port_and_direct_ip_qr(app, admin, monkeypatch):
+    import qrcode
+    app.config.update(QUIZ_PORT=5059, QUIZ_DIRECT_IP='192.168.254.112')
+    info = admin.get('/admin/connection').json
+    assert info['direct_url'] == 'http://192.168.254.112:5059'
+    assert info['hostname_url'].endswith(':5059')
+    assert not info['hostname_ready']
+    html = admin.get('/admin/dashboard').text
+    assert 'id="primary-url" href="http://192.168.254.112:5059"' in html
+    payloads = []
+    original = qrcode.QRCode.add_data
+    def capture(qr, data, *args, **kwargs):
+        payloads.append(data)
+        return original(qr, data, *args, **kwargs)
+    monkeypatch.setattr(qrcode.QRCode, 'add_data', capture)
+    assert admin.get('/admin/generate-qr').mimetype == 'image/png'
+    assert payloads == ['http://192.168.254.112:5059']

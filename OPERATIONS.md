@@ -155,6 +155,28 @@ These use temporary databases and temporary Docker volumes. The benchmark runs i
 
 For browser rehearsal, run `.venv/bin/python scripts/serve_fixture.py` on loopback port 5059. Its synthetic accounts are `admin1`, `tab1`–`tab15`, password `test-password`; these exist only in the temporary fixture. `scripts/browser_check.js` runs through Playwright CLI against this fixture. It is never used on the operational event database.
 
+To share the native Windows preview with other devices, specify the host's actual LAN IPv4
+address (find it with `Get-NetIPConfiguration`). For example:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\serve_fixture.py --database tmp\siklab-demo-preserved.db --lan-ip 192.168.254.112 --port 5059
+```
+
+`--database` resumes an existing demo database without reseeding; omit it for a new disposable
+fixture. LAN mode listens on all IPv4 interfaces, and Connect Tabulators uses a direct-IP QR
+with the actual preview port. It does not publish the `.local` hostname. If the host IP changes,
+restart with the new address. On a trusted Private network, run the following in an
+administrator PowerShell to allow this preview port only from the selected interface's subnet:
+
+```powershell
+.\scripts\Enable-PreviewLan.ps1 -Port 5059 -Interface Ethernet
+```
+
+Other devices must join the same LAN and open `http://192.168.254.112:5059` (substitute your
+host IP). A successful host-local check does not prove access from another device. To remove
+the preview exception: `Remove-NetFirewallRule -Name JPCS-Quiz-Preview-5059` in administrator
+PowerShell. The Docker event launcher remains the supported path for hostname discovery.
+
 Before the actual event, test on **both Windows 11 and Linux**, then on real **iPad Safari**: login, both QR codes, rapid edits, locks, disconnect/reconnect, sleep/wake, round transitions, DHCP address change, a deliberate hostname collision, and operation with router internet unplugged. See `VERIFICATION.md` for which checks have actually been completed.
 
 References: [SQLite WAL](https://www.sqlite.org/wal.html), [Avahi publishing](https://man.archlinux.org/man/extra/avahi/avahi-publish.1.en), [Windows DNS-SD registration](https://learn.microsoft.com/en-us/windows/win32/api/windns/nf-windns-dnsserviceregister), [Docker firewall behavior](https://docs.docker.com/engine/network/packet-filtering-firewalls/), [Waitress configuration](https://docs.pylonsproject.org/projects/waitress/en/stable/arguments.html).

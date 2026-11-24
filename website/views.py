@@ -192,7 +192,10 @@ def generate_qr():
     if current_user.role != 'admin': return "Unauthorized", 403
     
     info = connection_info()
-    url = info['direct_url'] if request.args.get('target') == 'ip' else info['hostname_url']
+    target = request.args.get('target')
+    if target is None:
+        target = 'hostname' if info['hostname_ready'] or not info['direct_url'] else 'ip'
+    url = info['direct_url'] if target == 'ip' else info['hostname_url']
     if not url: return 'LAN address unavailable; run quiz doctor.', 503
 
     # 2. Generate QR Image

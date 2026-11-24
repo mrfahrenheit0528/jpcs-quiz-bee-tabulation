@@ -12,6 +12,7 @@ First startup imports the existing database into a persistent named volume, pres
 and sets up LAN access. The default URL is **http://jpcs-quiz.local:5000**.
 
 Read [OPERATIONS.md](OPERATIONS.md) for prerequisites, backups, restore, firewall commands and diagnostics.
+Read [LAN_SETUP.md](LAN_SETUP.md) for a step-by-step guide to hosting on another Windows PC and connecting tabulator devices.
 Read [VERIFICATION.md](VERIFICATION.md) for measured performance and hardware checks still outstanding.
 Do not run `seed.py` against event data; it is destructive.
 

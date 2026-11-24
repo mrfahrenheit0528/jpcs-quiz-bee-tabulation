@@ -77,12 +77,13 @@
                     <img id="connection-qr" src="{{ url_for('views.generate_qr') }}" alt="Connection QR" class="img-fluid" style="max-width: 250px;">
                 </div>
                 
-                <h4 class="fw-bold text-primary"><a id="hostname-url" href="{{ connection.hostname_url }}">{{ connection.hostname_url }}</a></h4>
-                <p>Direct-IP fallback: <a id="direct-url" href="{{ connection.direct_url or '#' }}">{{ connection.direct_url or 'LAN address unavailable' }}</a></p>
+                <h4 class="fw-bold text-primary"><a id="primary-url" href="{{ connection.hostname_url if connection.hostname_ready else connection.direct_url or '#' }}">{{ connection.hostname_url if connection.hostname_ready else connection.direct_url or 'LAN address unavailable' }}</a></h4>
+                <p>Hostname: <a id="hostname-url" href="{{ connection.hostname_url }}">{{ connection.hostname_url }}</a></p>
+                <p>Direct IP: <a id="direct-url" href="{{ connection.direct_url or '#' }}">{{ connection.direct_url or 'LAN address unavailable' }}</a></p>
                 <p id="discovery-status" class="small text-muted">{{ connection.discovery }}</p>
                 <div class="btn-group mb-3">
-                    <button type="button" class="btn btn-outline-primary btn-sm" id="qr-hostname">Hostname QR</button>
-                    <button type="button" class="btn btn-outline-primary btn-sm" id="qr-ip">Direct-IP QR</button>
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="qr-hostname" {% if not connection.hostname_ready %}disabled{% endif %}>Hostname QR</button>
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="qr-ip" {% if not connection.direct_url %}disabled{% endif %}>Direct-IP QR</button>
                 </div>
                 <p class="small text-muted">Make sure all devices are connected to the same Wi-Fi network.</p>
             </div>
@@ -93,5 +94,5 @@
     </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/connection.js') }}"></script>
+<script src="{{ url_for('static', filename='js/connection.js', v='lan-preview-1') }}"></script>
 {% endblock %}

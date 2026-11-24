@@ -9,10 +9,12 @@ def connection_info():
     try:
         state=json.loads(Path(current_app.config['QUIZ_NETWORK_FILE']).read_text())
     except (OSError,ValueError): pass
-    ip=state.get('ip')
+    preview_ip=current_app.config.get('QUIZ_DIRECT_IP')
+    ip=preview_ip or state.get('ip')
     stale=time.time()-state.get('updated_at',0)>20
     return {'hostname_url':f'http://{hostname}:{port}',
             'direct_url':f'http://{ip}:{port}' if ip else None,
-            'discovery':('Host discovery status unavailable; run quiz doctor.' if stale else state.get('message','Starting discovery.')),
-            'hostname_ready':not stale and state.get('status')=='ready',
+            'discovery':('LAN preview: use the direct-IP address. Hostname discovery is not running.' if preview_ip else
+                         'Host discovery status unavailable; run quiz doctor.' if stale else state.get('message','Starting discovery.')),
+            'hostname_ready':not preview_ip and not stale and state.get('status')=='ready',
             'ip':ip,'interface':state.get('interface')}
