@@ -4,7 +4,7 @@ from .models import User, Event, School, Round, Score
 from . import db
 from sqlalchemy import func
 from sqlalchemy.dialects.sqlite import insert
-from .scoring import EventTotals
+from .scoring import EventTotals, final_sort_key
 from .live import live_template
 from .network import connection_info
 from werkzeug.security import generate_password_hash
@@ -41,12 +41,29 @@ def home():
 def about():
     return render_template("about.html")
 
+
+@views.get('/siklab')
+@views.get('/siklab/fragment')
+def siklab_leaderboard():
+    from .siklab import standings
+    return live_template('viewer/siklab.html', **standings())
+
 # --- VIEWER LEADERBOARD (FIXED SORTING) ---
 @views.route('/leaderboard/fragment')
 @views.route('/leaderboard')
 def leaderboard():
     active_event = Event.query.filter_by(is_active=True).first()
     if not active_event: return live_template('viewer/leaderboard.html', event=None)
+
+    if active_event.scoring_type == 'cumulative':
+        from .siklab import standings
+        context = standings()
+        for row in context['rankings']:
+            row['total'] = row['points']
+            row['is_competing'] = bool(context['active_round'] and row['in_stage'])
+        return live_template('viewer/leaderboard.html', event=active_event,
+                             rankings=context['rankings'], rounds=context.get('rounds', []),
+                             active_round=context['active_round'], is_hybrid_final=False)
 
     active_round = Round.query.filter_by(event_id=active_event.id, is_active=True).first()
     
@@ -633,7 +650,8 @@ def evaluate_round(round_id):
     cutoff = current_round.qualifying_count
     event = Event.query.get(event_id)
     
-    if cutoff == 0 and 'Clincher' not in current_round.difficulty:
+    final_clincher_mode = current_round.is_final and event.scoring_type in ('hybrid', 'cumulative') and 'Tie Breaker' not in current_round.difficulty
+    if cutoff == 0 and 'Clincher' not in current_round.difficulty and not final_clincher_mode:
         flash('No qualifying limit set. Proceed manually.', category='info')
         return redirect(url_for('views.round_control'))
 
@@ -655,7 +673,7 @@ def evaluate_round(round_id):
             event.scoring_type == 'per_round' or (event.scoring_type == 'hybrid' and selected.is_final)):
             return totals.points(school_id, selected.id)
         return sum(totals.points(school_id, r.id) for r in score_rounds
-                   if r.number <= selected.number and 'Tie Breaker' not in r.difficulty)
+                   if r.number <= selected.number and 'Tie Breaker' not in r.difficulty and 'Clincher' not in r.difficulty)
 
     for school in participating_schools:
         score_val = evaluation_points(school.id, current_round)
@@ -684,6 +702,12 @@ def evaluate_round(round_id):
                 match = re.search(r'Clincher (\d+)', current_round.difficulty)
                 current_num = int(match.group(1)) if match else 1
                 next_num = current_num + 1
+
+                if any(r.number == current_round.number and r.difficulty == f'Clincher {next_num}'
+                       and set((r.participating_school_ids or '').split(',')) == set(tied_ids)
+                       for r in score_rounds):
+                    ties_created += 1
+                    continue
                 
                 tb_round = Round(
                     event_id=event_id,
@@ -702,6 +726,8 @@ def evaluate_round(round_id):
         db.session.commit()
         
         if ties_created > 0:
+            current_round.is_active = False
+            db.session.commit()
             flash(f"Evaluation Complete. Created {ties_created} new Clincher round(s) for remaining ties.", "warning")
             return redirect(url_for('views.round_control'))
         else:
@@ -709,28 +735,43 @@ def evaluate_round(round_id):
             current_round.is_active = False
             db.session.commit()
             # === FIX END ===
+
+            # A different tied placement may still have an unfinished clincher.
+            clinchers = [r for r in score_rounds if r.number == current_round.number and 'Clincher' in r.difficulty]
+            for clincher in clinchers:
+                participants = [s for s in all_schools if clincher.is_school_allowed(s.id)]
+                pending = any(totals.answered(s.id, clincher.id) < clincher.total_questions for s in participants)
+                groups = {}
+                for school in participants:
+                    groups.setdefault(totals.points(school.id, clincher.id), set()).add(str(school.id))
+                for ids in groups.values():
+                    if len(ids) > 1 and not any(r.id > clincher.id and
+                            set((r.participating_school_ids or '').split(',')) == ids for r in clinchers):
+                        pending = True
+                if pending:
+                    flash('Complete the remaining clincher rounds to finalize placements.', 'warning')
+                    return redirect(url_for('views.round_control'))
             
             flash("Evaluation Complete. All ties broken! Final Ranking is set.", "success")
             return redirect(url_for('views.final_results', event_id=event_id))
 
-    # === HYBRID FINAL - First Trigger ===
-    if event.scoring_type == 'hybrid' and current_round.is_final and not 'Clincher' in current_round.difficulty:
-        for i in range(len(standings) - 1):
-            if standings[i]['score'] == standings[i+1]['score']:
-                tied_score = standings[i]['score']
-                tied_group = [s['school'] for s in standings if s['score'] == tied_score]
-                ids_string = ",".join([str(s.id) for s in tied_group])
-                
-                tb_round = Round(
-                    event_id=event.id, number=current_round.number, 
-                    difficulty="Clincher 1",
-                    points=1, total_questions=1, participating_school_ids=ids_string,
-                    qualifying_count=0, is_active=False, is_final=False
-                )
-                db.session.add(tb_round)
-                db.session.commit()
-                flash(f"⚠️ Tie detected in Final Round. 'Clincher 1' created.", category='warning')
-                return redirect(url_for('views.round_control'))
+    # Finals resolve all tied placements, including ties above the cutoff.
+    if final_clincher_mode and 'Clincher' not in current_round.difficulty:
+        tied_groups = [list(group) for _, group in groupby(standings, key=lambda row: row['score'])]
+        tied_groups = [group for group in tied_groups if len(group) > 1]
+        existing = {frozenset((r.participating_school_ids or '').split(','))
+                    for r in score_rounds if r.number == current_round.number and r.difficulty == 'Clincher 1'}
+        for group in tied_groups:
+            ids = [str(row['school'].id) for row in group]
+            if frozenset(ids) not in existing:
+                db.session.add(Round(
+                    event_id=event.id, number=current_round.number, difficulty='Clincher 1',
+                    points=1, total_questions=1, participating_school_ids=','.join(ids),
+                    qualifying_count=0, is_active=False, is_final=False))
+        if tied_groups:
+            db.session.commit()
+            flash('Final-round ties detected. Complete the clincher rounds to resolve placements.', 'warning')
+            return redirect(url_for('views.round_control'))
         
         # === FIX START: Stop the round automatically if no ties ===
         current_round.is_active = False
@@ -851,7 +892,9 @@ def final_results(event_id):
              else:
                  c_scores_list.append(-1)
         
-        data['sort_key'] = (data['has_final'], data['final_score'], tuple(c_scores_list), data['cum_total'])
+        data['clincher_scores'] = c_scores_list
+        data['ranking_score'] = data['final_score'] + (data['cum_total'] if event.scoring_type == 'cumulative' else 0)
+        data['sort_key'] = final_sort_key(event.scoring_type, data['has_final'], data['final_score'], data['cum_total'], c_scores_list)
         rankings.append(data)
 
     rankings.sort(key=lambda x: x['sort_key'], reverse=True)
@@ -917,12 +960,8 @@ def download_results_pdf(event_id):
                  c_scores_list.append(-1) 
         
         data['clincher_scores'] = c_scores_list
-        data['sort_key'] = (
-            data['has_final'], 
-            data['final_score'], 
-            tuple(c_scores_list), 
-            data['cum_total']
-        )
+        data['ranking_score'] = data['final_score'] + (data['cum_total'] if event.scoring_type == 'cumulative' else 0)
+        data['sort_key'] = final_sort_key(event.scoring_type, data['has_final'], data['final_score'], data['cum_total'], c_scores_list)
         rankings.append(data)
 
     rankings.sort(key=lambda x: x['sort_key'], reverse=True)
@@ -1006,6 +1045,8 @@ def download_results_pdf(event_id):
     cols.append({'name': 'CUMULATIVE', 'type': 'cum_total', 'bg': True})
     if final_round:
         cols.append({'name': 'FINAL', 'type': 'final', 'bg': True})
+    if event.scoring_type == 'cumulative':
+        cols.append({'name': 'TOTAL', 'type': 'ranking_total', 'bg': True})
     for idx, r in enumerate(final_clinchers):
         cols.append({'name': f'C{idx+1}', 'type': 'clincher', 'idx': idx})
 
@@ -1060,6 +1101,9 @@ def download_results_pdf(event_id):
                     pdf.set_font("Arial", 'B', 10)
                 else:
                     val = "-" 
+            elif col['type'] == 'ranking_total':
+                val = str(rank['ranking_score'])
+                pdf.set_font("Arial", 'B', 10)
             elif col['type'] == 'clincher':
                 score_list = rank['clincher_scores']
                 idx = col['idx']

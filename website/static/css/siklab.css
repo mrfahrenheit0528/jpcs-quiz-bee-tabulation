@@ -1,0 +1,29 @@
+/* Original leaderboard styles; sizing accommodates the projection screen. */
+body { font-family: 'Poppins', sans-serif; background-color: #f8f9fa; }
+.text-primary { color: #800000 !important; }
+.board { height: 100vh; height: 100dvh; padding: 3vh 4vw; display: flex; flex-direction: column; }
+.board h1 { font-size: clamp(20px, 2.65vw, 52px); flex-shrink: 0; }
+.board h4 { font-size: clamp(16px, 1.8vw, 34px); flex-shrink: 0; }
+.standings-card { flex: 1; min-height: 0; border: none; border-radius: 0; }
+.standings-card .card-body { min-height: 0; height: 100%; }
+.standings-card table { height: 100%; }
+.standings-card td { padding-top: .5vh; padding-bottom: .5vh; }
+.table th:first-child { width: 7%; }
+.round-column { width: 15%; }
+.score-column { width: 18%; }
+.table th { font-size: clamp(10px, 1.2vw, 23px); }
+.rank { font-size: clamp(22px, min(3.6vw, 5.7vh), 72px); line-height: 1.1; }
+.participant { font-size: clamp(16px, min(2.65vw, 3.6vh), 52px); line-height: 1.2; overflow-wrap: anywhere; }
+.round-score { font-size: clamp(20px, min(3vw, 4.8vh), 60px); line-height: 1.1; }
+.points { font-size: clamp(28px, min(4.6vw, 6.8vh), 92px); line-height: 1.1; }
+.rank-moving { position: relative; z-index: 1; }
+.rank-1 { --bs-table-bg: #fffde7; border-left: 8px solid #ffd700; }
+.rank-2 { --bs-table-bg: #f5f5f5; border-left: 8px solid #c0c0c0; }
+.rank-3 { --bs-table-bg: #fff3e0; border-left: 8px solid #cd7f32; }
+.empty-state { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+@media (max-width: 600px) {
+    .board { padding: 2vh 3vw; }
+    .table > :not(caption) > * > * { padding: .4rem .25rem; }
+    .table th { font-size: 9px; }
+    .participant { font-size: 16px; }
+}

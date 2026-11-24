@@ -3,6 +3,13 @@ from sqlalchemy import func, case
 from . import db
 from .models import Score, Round
 
+
+def final_sort_key(mode, qualified, final_score, history_total, clincher_scores):
+    """Clinchers break ties in the event's ranking score; they add no base points."""
+    if mode == 'cumulative':
+        return (qualified, history_total + final_score, tuple(clincher_scores))
+    return (qualified, final_score, tuple(clincher_scores), history_total)
+
 class EventTotals:
     def __init__(self, event_id):
         rows = db.session.query(Score.school_id, Score.round_id, func.count(Score.id),

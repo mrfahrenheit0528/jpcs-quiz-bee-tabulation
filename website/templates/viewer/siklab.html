@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ event.name if event else 'Live Leaderboard' }} | Live Standings</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/poppins/poppins.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/animations.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/siklab.css') }}">
+    <script defer src="{{ url_for('static', filename='js/siklab.js', v='ranking-motion-1') }}"></script>
+</head>
+<body>
+    {% include 'viewer/siklab_fragment.html' %}
+    <noscript><meta http-equiv="refresh" content="3"></noscript>
+</body>
+</html>

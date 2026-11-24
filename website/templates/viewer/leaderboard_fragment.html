@@ -63,7 +63,7 @@
                             <!-- ROUND SCORES -->
                             {% for r in rounds %}
                                 <td class="text-muted">
-                                    {{ rank.breakdown.get(r.difficulty, '-') }}
+                                    {{ rank.breakdown.get(r.id, rank.breakdown.get(r.difficulty, '-')) }}
                                 </td>
                             {% endfor %}
                             
