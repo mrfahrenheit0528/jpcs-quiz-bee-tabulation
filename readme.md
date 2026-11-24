@@ -4,6 +4,17 @@ A web-based tabulation system developed for the **Junior Philippine Computer Soc
 
 The system supports multiple competition formats, including cumulative scoring, clean-slate final rounds, and recursive clincher rounds for unresolved ties.
 
+## LAN event launcher
+
+Use `./quiz start` on Omarchy/Arch with native Docker Engine, or
+`powershell -NoProfile -ExecutionPolicy Bypass -File .\quiz.ps1 start` on Windows 11 with Docker Desktop.
+First startup imports the existing database into a persistent named volume, preserves existing accounts,
+and sets up LAN access. The default URL is **http://jpcs-quiz.local:5000**.
+
+Read [OPERATIONS.md](OPERATIONS.md) for prerequisites, backups, restore, firewall commands and diagnostics.
+Read [VERIFICATION.md](VERIFICATION.md) for measured performance and hardware checks still outstanding.
+Do not run `seed.py` against event data; it is destructive.
+
 ---
 
 ## Project Explanation
@@ -79,48 +90,12 @@ This reduces the need for manual tabulation and helps provide a more consistent 
 
 ## Installation & Setup
 
-### 1. Clone the Repository
+Install Docker Engine with Compose on Linux, or Docker Desktop with Linux containers on Windows 11.
+Keep the existing `instance/database.db` in this checkout. Run the event launcher above;
+it imports existing accounts and data on the first start only.
 
-```bash
-git clone https://github.com/mrfahrenheit0528/jpcs-quiz-bee-tabulation.git
-cd jpcs-quiz-bee-tabulation
-```
-
-### 2. Create a Virtual Environment
-
-```bash
-python -m venv .venv
-```
-
-**Windows**
-
-```bash
-.venv\Scripts\activate
-```
-
-**macOS/Linux**
-
-```bash
-source .venv/bin/activate
-```
-
-### 3. Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Run the Application
-
-```bash
-python main.py
-```
-
-The application will run at:
-
-```text
-http://127.0.0.1:5000
-```
+For local development and disposable test fixtures, see [OPERATIONS.md](OPERATIONS.md).
+`main.py` is the production container entry point and expects a prepared data directory.
 
 ---
 
@@ -128,7 +103,7 @@ http://127.0.0.1:5000
 
 ### Admin
 
-- Log in through `/login` (`admin1`, `adminpass` if seed.py used)
+- Log in through `/login` (use an existing event account)
 - Create and configure an event
 - Define competition rounds
 - Set the number of qualifiers

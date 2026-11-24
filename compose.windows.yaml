@@ -1,0 +1,4 @@
+services:
+  app:
+    ports:
+      - "${QUIZ_PORT:-5000}:${QUIZ_PORT:-5000}"

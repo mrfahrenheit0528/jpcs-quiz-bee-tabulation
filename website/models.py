@@ -34,6 +34,8 @@ class Round(db.Model):
     points = db.Column(db.Integer, nullable=False)
     total_questions = db.Column(db.Integer, nullable=False)
     
+    __table_args__ = (db.Index('ix_round_event_number', 'event_id', 'number'),)
+
     # Control Logic
     is_active = db.Column(db.Boolean, default=False)
     qualifying_count = db.Column(db.Integer, default=0)
@@ -66,6 +68,7 @@ class School(db.Model):
     # Allows "School A" in Event 1 and "School A" in Event 2.
     __table_args__ = (
         UniqueConstraint('name', 'event_id', name='unique_school_per_event'),
+        db.Index('ix_school_event_user', 'event_id', 'user_id'),
     )
 
 # Score Model
@@ -75,3 +78,7 @@ class Score(db.Model):
     school_id = db.Column(db.Integer, db.ForeignKey('school.id'), nullable=False)
     question_number = db.Column(db.Integer, nullable=False)
     is_correct = db.Column(db.Boolean, default=False)
+    __table_args__ = (
+        db.Index('uq_score_answer', 'round_id', 'school_id', 'question_number', unique=True),
+        db.Index('ix_score_school', 'school_id'),
+    )

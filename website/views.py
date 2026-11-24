@@ -3,11 +3,14 @@ from flask_login import login_required, current_user
 from .models import User, Event, School, Round, Score
 from . import db
 from sqlalchemy import func
+from sqlalchemy.dialects.sqlite import insert
+from .scoring import EventTotals
+from .live import live_template
+from .network import connection_info
 from werkzeug.security import generate_password_hash
 from fpdf import FPDF
 from itertools import groupby 
 import os
-import socket
 import qrcode
 import io
 from flask import send_file
@@ -30,16 +33,6 @@ def set_active_event(event_id):
         return True
     return False
 
-def get_network_ip():
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
-    except:
-        return "127.0.0.1"
-
 @views.route('/')
 def home():
     return render_template("home.html")
@@ -49,10 +42,11 @@ def about():
     return render_template("about.html")
 
 # --- VIEWER LEADERBOARD (FIXED SORTING) ---
+@views.route('/leaderboard/fragment')
 @views.route('/leaderboard')
 def leaderboard():
     active_event = Event.query.filter_by(is_active=True).first()
-    if not active_event: return render_template('viewer/leaderboard.html', event=None)
+    if not active_event: return live_template('viewer/leaderboard.html', event=None)
 
     active_round = Round.query.filter_by(event_id=active_event.id, is_active=True).first()
     
@@ -86,6 +80,7 @@ def leaderboard():
         display_rounds = cumulative_history_rounds
 
     # --- 2. CALCULATE SCORES ---
+    totals = EventTotals(active_event.id)
     schools = School.query.filter_by(event_id=active_event.id).all()
     rankings = []
     
@@ -94,13 +89,13 @@ def leaderboard():
         
         # A. Scores for Displayed Columns
         for r in display_rounds:
-            r_score = sum(s.round.points for s in school.scores if s.round_id == r.id and s.is_correct)
+            r_score = totals.points(school.id, r.id)
             round_scores[r.difficulty] = r_score
         
         # B. Calculate Historical Total (For sorting fallback)
         history_total = 0
         for r in cumulative_history_rounds:
-            history_total += sum(s.round.points for s in school.scores if s.round_id == r.id and s.is_correct)
+            history_total += totals.points(school.id, r.id)
 
         # C. Build Sort Key
         sort_key = []
@@ -149,7 +144,7 @@ def leaderboard():
 
     rankings.sort(key=lambda x: x['sort_key'], reverse=True)
 
-    return render_template('viewer/leaderboard.html', 
+    return live_template('viewer/leaderboard.html',
                            event=active_event, 
                            rankings=rankings, 
                            rounds=display_rounds,
@@ -163,10 +158,15 @@ def leaderboard():
 def admin_dashboard():
     if current_user.role != 'admin': return "Unauthorized", 403
     
-    server_ip = get_network_ip()
-    server_url = f"http://{server_ip}:5000"
-    
-    return render_template('admin/admin_dashboard.html', server_url=server_url)
+    return render_template('admin/admin_dashboard.html', connection=connection_info())
+
+@views.get('/admin/connection')
+@login_required
+def connection_status():
+    if current_user.role != 'admin': return 'Unauthorized', 403
+    response = jsonify(connection_info())
+    response.headers['Cache-Control'] = 'no-store'
+    return response
 
 # --- QR CODE ROUTE ---
 @views.route('/admin/generate-qr')
@@ -174,11 +174,10 @@ def admin_dashboard():
 def generate_qr():
     if current_user.role != 'admin': return "Unauthorized", 403
     
-    # 1. Determine the URL
-    ip = get_network_ip()
-    port = 5000 # Default Flask port
-    url = f"http://{ip}:{port}"
-    
+    info = connection_info()
+    url = info['direct_url'] if request.args.get('target') == 'ip' else info['hostname_url']
+    if not url: return 'LAN address unavailable; run quiz doctor.', 503
+
     # 2. Generate QR Image
     qr = qrcode.QRCode(version=1, box_size=10, border=5)
     qr.add_data(url)
@@ -190,7 +189,9 @@ def generate_qr():
     img.save(img_io, 'PNG')
     img_io.seek(0)
     
-    return send_file(img_io, mimetype='image/png')
+    response = send_file(img_io, mimetype='image/png')
+    response.headers['Cache-Control'] = 'no-store'
+    return response
 
 @views.route('/admin/register-user', methods=['GET', 'POST'])
 @login_required
@@ -329,6 +330,7 @@ def school_registration(event_id):
             flash(f'School "{school_name}" added.', category='success')
             return redirect(url_for('views.school_registration', event_id=event.id))
 
+    totals = EventTotals(event.id)
     schools = School.query.filter_by(event_id=event.id).all()
     all_tabulators = User.query.filter_by(role='tabulator').all()
     return render_template('admin/school_registration.html', event=event, schools=schools, all_tabulators=all_tabulators)
@@ -455,6 +457,7 @@ def delete_round(round_id):
     flash('Round deleted.', category='success')
     return redirect(url_for('views.round_setup', event_id=event_id))
 
+@views.route('/admin/round-control/fragment')
 @views.route('/admin/round-control')
 @login_required
 def round_control():
@@ -509,6 +512,7 @@ def round_control():
                      Round.difficulty.notlike('%Tie Breaker%')
                  ).order_by(Round.number.asc()).all()
              
+        totals = EventTotals(active_event.id)
         all_schools = School.query.filter_by(event_id=active_event.id).all()
         participating_schools = []
 
@@ -521,14 +525,9 @@ def round_control():
         all_schools_finished = True 
         
         for school in participating_schools:
-            scores_in_this_round = Score.query.filter_by(school_id=school.id, round_id=active_round.id).all()
-            current_round_points = 0
-            answered_count = 0
-            
-            for s in scores_in_this_round:
-                answered_count += 1
-                if s.is_correct: current_round_points += active_round.points
-            
+            current_round_points = totals.points(school.id, active_round.id)
+            answered_count = totals.answered(school.id, active_round.id)
+
             if answered_count < active_round.total_questions:
                 all_schools_finished = False
 
@@ -537,8 +536,7 @@ def round_control():
             
             if show_cumulative:
                 for r in previous_rounds:
-                    r_score = sum(s.round.points for s in school.scores 
-                                  if s.round_id == r.id and s.is_correct)
+                    r_score = totals.points(school.id, r.id)
                     breakdown[r.id] = r_score
                     main_score_for_sorting += r_score
                 main_score_for_sorting += current_round_points
@@ -547,8 +545,7 @@ def round_control():
                 # Hybrid Final Phase Sorting Logic
                 is_clincher = ('Tie Breaker' in active_round.difficulty or 'Clincher' in active_round.difficulty)
                 if is_clincher and final_round:
-                     final_score = sum(s.round.points for s in school.scores 
-                                       if s.round_id == final_round.id and s.is_correct)
+                     final_score = totals.points(school.id, final_round.id)
                      breakdown[final_round.id] = final_score
                      main_score_for_sorting = (final_score, current_round_points)
                 else:
@@ -583,7 +580,7 @@ def round_control():
         if participating_schools and all_schools_finished:
             round_fully_completed = True
 
-    return render_template('admin/round_control.html', 
+    return live_template('admin/round_control.html',
                            event=active_event, 
                            rounds=rounds, 
                            active_round=active_round, 
@@ -650,29 +647,18 @@ def evaluate_round(round_id):
     else:
         participating_schools = all_schools
 
+    totals = EventTotals(event.id)
+    score_rounds = Round.query.filter_by(event_id=event.id).all()
+
+    def evaluation_points(school_id, selected):
+        if ('Tie Breaker' in selected.difficulty or 'Clincher' in selected.difficulty or
+            event.scoring_type == 'per_round' or (event.scoring_type == 'hybrid' and selected.is_final)):
+            return totals.points(school_id, selected.id)
+        return sum(totals.points(school_id, r.id) for r in score_rounds
+                   if r.number <= selected.number and 'Tie Breaker' not in r.difficulty)
+
     for school in participating_schools:
-        score_val = 0
-        if 'Tie Breaker' in current_round.difficulty or 'Clincher' in current_round.difficulty:
-            score_val = sum(s.round.points for s in school.scores 
-                            if s.round_id == current_round.id and s.is_correct)
-        elif event.scoring_type == 'hybrid':
-            if current_round.is_final:
-                score_val = sum(s.round.points for s in school.scores 
-                                if s.round_id == current_round.id and s.is_correct)
-            else:
-                for s in school.scores:
-                    if (s.round.event_id == event.id and 
-                        s.round.number <= current_round.number and 
-                        'Tie Breaker' not in s.round.difficulty and 
-                        s.is_correct):
-                        score_val += s.round.points
-        elif event.scoring_type == 'cumulative':
-            for s in school.scores:
-                if (s.round.event_id == event.id and s.round.number <= current_round.number and 'Tie Breaker' not in s.round.difficulty and s.is_correct):
-                    score_val += s.round.points
-        else:
-            score_val = sum(s.round.points for s in school.scores if s.round_id == current_round.id and s.is_correct)
-        
+        score_val = evaluation_points(school.id, current_round)
         standings.append({'school': school, 'score': score_val})
     
     standings.sort(key=lambda x: x['score'], reverse=True)
@@ -795,16 +781,7 @@ def evaluate_round(round_id):
             p_standings = []
             for s in p_schools:
                 if parent_round.participating_school_ids and str(s.id) not in parent_round.participating_school_ids.split(','): continue
-                sc = 0
-                is_parent_final = parent_round.is_final
-                if event.scoring_type == 'hybrid' and is_parent_final:
-                     sc = sum(score.round.points for s in s.scores if score.round_id == parent_round.id and score.is_correct)
-                elif event.scoring_type == 'cumulative' or (event.scoring_type == 'hybrid' and not is_parent_final):
-                    for score in s.scores:
-                         if (score.round.event_id == event.id and score.round.number <= parent_round.number and 'Tie Breaker' not in score.round.difficulty and score.is_correct):
-                             sc += score.round.points
-                else:
-                    sc = sum(score.round.points for s in s.scores if score.round_id == parent_round.id and score.is_correct)
+                sc = evaluation_points(s.id, parent_round)
                 p_standings.append({'school': s, 'score': sc})
             p_standings.sort(key=lambda x: x['score'], reverse=True)
             clean_winners = [x['school'] for x in p_standings[:clean_spots]]
@@ -850,6 +827,7 @@ def final_results(event_id):
             Round.difficulty.like('%Clincher%')
         ).order_by(Round.id.asc()).all()
     
+    totals = EventTotals(event.id)
     schools = School.query.filter_by(event_id=event.id).all()
     rankings = []
     
@@ -858,18 +836,18 @@ def final_results(event_id):
         
         # 1. Cumulative
         for r in cumulative_rounds:
-            data['cum_total'] += sum(s.round.points for s in school.scores if s.round_id == r.id and s.is_correct)
+            data['cum_total'] += totals.points(school.id, r.id)
             
         # 2. Final
         if final_round and final_round.is_school_allowed(school.id):
             data['has_final'] = True
-            data['final_score'] = sum(s.round.points for s in school.scores if s.round_id == final_round.id and s.is_correct)
+            data['final_score'] = totals.points(school.id, final_round.id)
         
         # 3. Clinchers
         c_scores_list = []
         for r in final_clinchers:
              if r.is_school_allowed(school.id):
-                 c_scores_list.append(sum(s.round.points for s in school.scores if s.round_id == r.id and s.is_correct))
+                 c_scores_list.append(totals.points(school.id, r.id))
              else:
                  c_scores_list.append(-1)
         
@@ -906,6 +884,7 @@ def download_results_pdf(event_id):
         ).order_by(Round.id.asc()).all()
 
     # --- 2. CALCULATE SCORES ---
+    totals = EventTotals(event.id)
     schools = School.query.filter_by(event_id=event.id).all()
     rankings = []
     
@@ -920,20 +899,19 @@ def download_results_pdf(event_id):
         }
         
         for r in cumulative_rounds:
-            score = sum(s.round.points for s in school.scores if s.round_id == r.id and s.is_correct)
+            score = totals.points(school.id, r.id)
             data['cum_breakdown'][r.id] = score
             data['cum_total'] += score
             
         if final_round:
             if final_round.is_school_allowed(school.id):
                 data['has_final'] = True
-                data['final_score'] = sum(s.round.points for s in school.scores 
-                                          if s.round_id == final_round.id and s.is_correct)
+                data['final_score'] = totals.points(school.id, final_round.id)
         
         c_scores_list = []
         for r in final_clinchers:
              if r.is_school_allowed(school.id):
-                 s_val = sum(s.round.points for s in school.scores if s.round_id == r.id and s.is_correct)
+                 s_val = totals.points(school.id, r.id)
                  c_scores_list.append(s_val)
              else:
                  c_scores_list.append(-1) 
@@ -960,7 +938,7 @@ def download_results_pdf(event_id):
             # --- CUSTOM HEADER DESIGN ---
             
             # 1. Background Image (header.png)
-            header_bg = os.path.join(current_app.root_path, 'static', 'header.png')
+            header_bg = os.path.join(current_app.root_path, 'static', 'pdf', 'header.png')
             
             if os.path.exists(header_bg):
                 # Use the PNG as background (Full width 297mm)
@@ -971,7 +949,7 @@ def download_results_pdf(event_id):
                 self.rect(0, 0, 297, 35, 'F')
 
             # 2. Logo (JPTABS.png)
-            logo_path = os.path.join(current_app.root_path, 'static', 'JPCS.png')
+            logo_path = os.path.join(current_app.root_path, 'static', 'pdf', 'JPCS.png')
             if os.path.exists(logo_path):
                 self.image(logo_path, x=12, y=4, w=25)
 
@@ -1164,6 +1142,7 @@ def download_results_pdf(event_id):
 
 # --- TABULATOR ROUTES ---
 
+@views.route('/tabulator/dashboard/fragment')
 @views.route('/tabulator/dashboard')
 @login_required
 def tabulator_dashboard():
@@ -1174,7 +1153,7 @@ def tabulator_dashboard():
     if active_event:
         school = School.query.filter_by(event_id=active_event.id, user_id=current_user.id).first()
         rounds = active_event.rounds
-    return render_template('tabulator/tabulator_dashboard.html', school=school, active_event=active_event, rounds=rounds)
+    return live_template('tabulator/tabulator_dashboard.html', school=school, active_event=active_event, rounds=rounds)
 
 def scoring_access(current_round):
     """Shared checks for the tabulator scoring routes.
@@ -1189,13 +1168,11 @@ def scoring_access(current_round):
     return school, None
 
 def save_answer(school, current_round, q_num, is_correct_val):
-    existing_score = Score.query.filter_by(
-        school_id=school.id, round_id=current_round.id, question_number=q_num).first()
-    if existing_score: existing_score.is_correct = is_correct_val
-    else:
-        new_score = Score(school_id=school.id, round_id=current_round.id,
-                          question_number=q_num, is_correct=is_correct_val)
-        db.session.add(new_score)
+    statement = insert(Score).values(school_id=school.id, round_id=current_round.id,
+                                     question_number=q_num, is_correct=is_correct_val)
+    db.session.execute(statement.on_conflict_do_update(
+        index_elements=['round_id', 'school_id', 'question_number'],
+        set_={'is_correct': statement.excluded.is_correct}))
 
 @views.route('/tabulator/scoring/<int:round_id>', methods=['GET', 'POST'])
 @login_required
@@ -1236,7 +1213,7 @@ def scoring_save(round_id):
 
     data = request.get_json(silent=True) or {}
     q_num, status = data.get('question'), data.get('status')
-    if not isinstance(q_num, int) or not 1 <= q_num <= current_round.total_questions or status not in ('correct', 'wrong'):
+    if type(q_num) is not int or not 1 <= q_num <= current_round.total_questions or status not in ('correct', 'wrong'):
         return jsonify(error='Invalid answer.'), 400
 
     save_answer(school, current_round, q_num, status == 'correct')

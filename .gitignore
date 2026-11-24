@@ -3,3 +3,13 @@ website/__pycache__/
 .vscode/
 .vscode/settings.json
 email.html
+__pycache__/
+.pytest_cache/
+backups/
+output/
+tmp/
+.quiz/
+quiz.env
+*.db-wal
+*.db-shm
+.playwright-cli/

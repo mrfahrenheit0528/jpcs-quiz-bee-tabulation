@@ -37,25 +37,35 @@
     function initLiveRegion(region) {
         const id = region.id;
         let busy = false;
+        let etag = null;
 
         // Don't swap the DOM out from under the user mid-interaction
         function userIsBusy() {
             const active = document.activeElement;
             return region.querySelector('.is-loading') ||
                    document.querySelector('.modal.show') ||
-                   (active && region.contains(active) && /^(INPUT|SELECT|TEXTAREA)$/.test(active.tagName));
+                   (active && region.contains(active) && /^(INPUT|SELECT|TEXTAREA|BUTTON|A)$/.test(active.tagName));
         }
 
         async function refresh() {
             if (busy || document.hidden || userIsBusy()) return;
             busy = true;
             try {
-                const res = await fetch(window.location.href, { cache: 'no-store', credentials: 'same-origin' });
-                if (!res.ok) return;
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 8000);
+                let res;
+                try {
+                    res = await fetch(region.dataset.liveUrl, {cache: 'no-cache', credentials: 'same-origin',
+                        headers: etag ? {'If-None-Match': etag} : {}, signal: controller.signal});
+                } finally { clearTimeout(timeout); }
+                if (res.redirected) { window.location.reload(); return; }
+                if (res.status === 304 || !res.ok) return;
                 const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
                 const fresh = doc.getElementById(id);
-                if (!fresh || fresh.innerHTML === region.innerHTML || userIsBusy()) return;
+                if (!fresh || userIsBusy()) return;
+                if (fresh.innerHTML === region.innerHTML) { etag = res.headers.get('ETag'); return; }
                 swap(region, fresh);
+                etag = res.headers.get('ETag');
             } catch (err) {
                 // Network hiccup: keep the current board and try again next tick
             } finally {
@@ -65,9 +75,11 @@
 
         // Re-read the interval each tick: the server can switch it (e.g. idle vs. live event)
         (function loop() {
-            setTimeout(function () { refresh().then(loop); }, parseInt(region.dataset.liveRefresh, 10) || 3000);
+            setTimeout(function () { refresh().then(loop); }, parseInt(region.dataset.liveRefresh, 10) || 1000);
         })();
         document.addEventListener('visibilitychange', refresh);
+        window.addEventListener('pageshow', refresh);
+        window.addEventListener('online', refresh);
     }
 
     function swap(region, fresh) {
@@ -83,8 +95,12 @@
             };
         });
 
+        const scrollX = window.scrollX, scrollY = window.scrollY;
+        const scrollers = Array.from(region.querySelectorAll('.table-responsive')).map(el => el.scrollLeft);
         region.classList.add('is-live-updated');
         region.innerHTML = fresh.innerHTML;
+        region.querySelectorAll('.table-responsive').forEach((el, i) => { el.scrollLeft = scrollers[i] || 0; });
+        window.scrollTo(scrollX, scrollY);
         if (fresh.dataset.liveRefresh) region.dataset.liveRefresh = fresh.dataset.liveRefresh;
 
         // LAST + INVERT + PLAY

@@ -1,0 +1,32 @@
+name: jpcs-quiz
+services:
+  app:
+    image: jpcs-quiz:local
+    build: .
+    init: true
+    restart: "no"
+    environment:
+      QUIZ_PORT: ${QUIZ_PORT:-5000}
+      QUIZ_HOSTNAME: ${QUIZ_HOSTNAME:-jpcs-quiz.local}
+      QUIZ_NETWORK_FILE: /network/network.json
+    volumes:
+      - quiz-data:/data
+      - type: bind
+        source: ./.quiz
+        target: /network
+        read_only: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, python, -c, "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:'+os.environ.get('QUIZ_PORT','5000')+'/healthz',timeout=3)"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    stop_grace_period: 20s
+volumes:
+  quiz-data:
+    name: ${QUIZ_VOLUME:-jpcs-quiz-data}

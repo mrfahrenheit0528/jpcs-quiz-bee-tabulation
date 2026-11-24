@@ -74,10 +74,16 @@
                 
                 <!-- QR Code Image -->
                 <div class="border p-2 d-inline-block rounded mb-3">
-                    <img src="{{ url_for('views.generate_qr') }}" alt="Connection QR" class="img-fluid" style="max-width: 250px;">
+                    <img id="connection-qr" src="{{ url_for('views.generate_qr') }}" alt="Connection QR" class="img-fluid" style="max-width: 250px;">
                 </div>
                 
-                <h4 class="fw-bold text-primary">{{ server_url }}</h4>
+                <h4 class="fw-bold text-primary"><a id="hostname-url" href="{{ connection.hostname_url }}">{{ connection.hostname_url }}</a></h4>
+                <p>Direct-IP fallback: <a id="direct-url" href="{{ connection.direct_url or '#' }}">{{ connection.direct_url or 'LAN address unavailable' }}</a></p>
+                <p id="discovery-status" class="small text-muted">{{ connection.discovery }}</p>
+                <div class="btn-group mb-3">
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="qr-hostname">Hostname QR</button>
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="qr-ip">Direct-IP QR</button>
+                </div>
                 <p class="small text-muted">Make sure all devices are connected to the same Wi-Fi network.</p>
             </div>
             <div class="modal-footer">
@@ -87,4 +93,5 @@
     </div>
 </div>
 
+<script src="{{ url_for('static', filename='js/connection.js') }}"></script>
 {% endblock %}

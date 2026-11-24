@@ -135,11 +135,18 @@
         };
         const statusEl = document.getElementById('save-status');
 
-        const pending = new Map();   // question -> latest unsaved status
+        const DRAFT_KEY = 'jpcs-draft-user{{ current_user.id }}-round{{ round.id }}-school{{ school.id }}';
+        let recovered = [];
+        try { recovered = JSON.parse(localStorage.getItem(DRAFT_KEY) || '[]'); } catch (err) {}
+        const pending = new Map(recovered.filter(([q, status]) => Number.isInteger(q) && q > 0 && q <= total && ['correct','wrong'].includes(status)));   // question -> latest unsaved status
         let inFlight = false;
         let offline = false;
         let stopped = false;
         let retryTimer = null;
+
+        function persistDraft() {
+            try { localStorage.setItem(DRAFT_KEY, JSON.stringify(Array.from(pending))); } catch (err) {}
+        }
 
         function setStatus(cls, icon, text) {
             statusEl.className = 'text-center fw-bold py-2 ' + cls;
@@ -222,11 +229,13 @@
         function roundClosed(message) {
             if (stopped) return;
             stopped = true;
-            pending.clear();
+            persistDraft();
             document.querySelectorAll('#scoring-form input, #scoring-form button').forEach(function (i) { i.disabled = true; });
             if (message) document.getElementById('round-closed-msg').textContent = message;
             document.getElementById('round-closed').hidden = false;
-            setTimeout(function () { window.location.href = DASHBOARD_URL; }, 3000);
+            if (pending.size) {
+                document.getElementById('round-closed-msg').textContent += ' ' + pending.size + ' answers remain unsaved on this device. Ask the admin to reopen the round to retry.';
+            } else setTimeout(function () { window.location.href = DASHBOARD_URL; }, 3000);
         }
 
         async function flush() {
@@ -234,9 +243,12 @@
             inFlight = true;
             renderStatus();
             const [q, status] = pending.entries().next().value;
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 15000);
             try {
                 const res = await fetch(SAVE_URL, {
                     method: 'POST',
+                    signal: controller.signal,
                     credentials: 'same-origin',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ question: q, status: status })
@@ -248,12 +260,13 @@
                 }
                 const data = await res.json();
                 if (res.status === 409 && data.closed) { roundClosed(data.error); return; }
-                if (res.status >= 400 && res.status < 500) { pending.clear(); window.location.reload(); return; } // out of sync: resync
+                if (res.status >= 400 && res.status < 500) { persistDraft(); roundClosed(data.error || 'Save rejected. Contact the admin.'); return; } // out of sync: resync
                 if (!res.ok) throw new Error(data.error || res.status);
 
                 // Only clear if the tabulator didn't change the answer while it was saving
                 if (pending.get(q) === status) {
                     pending.delete(q);
+                    persistDraft();
                     setSync(q, 'saved');
                 }
                 offline = false;
@@ -263,7 +276,7 @@
                 renderStatus();
                 if (!retryTimer) retryTimer = setTimeout(function () { retryTimer = null; flush(); }, 2000);
                 return;
-            }
+            } finally { clearTimeout(timeout); inFlight = false; }
             inFlight = false;
             flush();
         }
@@ -278,6 +291,7 @@
                 updateProgress();
 
                                 pending.set(q, input.value);
+                persistDraft();
                 setSync(q, 'saving');
                 applyLock(q, false);
                 flush();
@@ -285,28 +299,48 @@
         });
 
         // Poll the round: closed by admin, or Sudden Death (+1 Q) added
-        setInterval(async function () {
-            if (stopped) return;
+        let checking = false;
+        async function checkRound() {
+            if (checking || document.hidden || stopped) return;
+            checking = true;
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 8000);
             try {
-                const res = await fetch(STATUS_URL, { cache: 'no-store', credentials: 'same-origin' });
-                if (!res.ok || res.redirected) return;
+                const res = await fetch(STATUS_URL, {cache: 'no-store', credentials: 'same-origin', signal: controller.signal});
+                if (res.redirected) { persistDraft(); window.location.reload(); return; }
+                if (!res.ok) return;
                 const data = await res.json();
                 if (!data.open) roundClosed(data.message);
                 else if (data.total_questions !== total && !pending.size && !inFlight) window.location.reload();
-            } catch (err) {
-                // Offline: the save loop already shows the warning
-            }
-        }, 3000);
+            } catch (err) { /* Save status retains pending changes during connection loss. */ }
+            finally { clearTimeout(timeout); checking = false; }
+        }
+        (function poll() { setTimeout(() => checkRound().then(poll), 1000); })();
+        function resume() { if (!document.hidden) { checkRound(); flush(); } }
+        document.addEventListener('visibilitychange', resume);
+        window.addEventListener('pageshow', resume);
+        window.addEventListener('online', resume);
 
         // Warn before leaving with unsaved answers
         window.addEventListener('beforeunload', function (e) {
-            if (pending.size && !stopped) { e.preventDefault(); e.returnValue = ''; }
+            if (pending.size) { e.preventDefault(); e.returnValue = ''; }
         });
 
         // Auto-save replaces the manual submit (kept only as a no-JS fallback)
         document.getElementById('scoring-form').addEventListener('submit', function (e) { e.preventDefault(); });
 
+        pending.forEach(function(status, q) {
+            const input = document.getElementById('q' + q + '_' + status);
+            input.checked = true;
+            const card = input.closest('.question-card');
+            card.classList.toggle('is-correct', status === 'correct');
+            card.classList.toggle('is-wrong', status === 'wrong');
+            card.querySelector('.q-status').innerHTML = badges[status];
+            setSync(q, 'saving');
+            applyLock(q, false);
+        });
         updateProgress();
+        flush();
     });
 </script>
 {% endblock %}

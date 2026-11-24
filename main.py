@@ -1,28 +1,15 @@
+"""Production entry point. Use ./quiz start for data import, LAN and discovery."""
+from waitress import serve
 from website import create_app
-import socket
+from website.manage import DATA, exclusive, secret
+from website.migrate import migrate
 
-app = create_app()
+def main():
+    with exclusive():
+        migrate(DATA/'database.db')
+        app=create_app({'SECRET_KEY':secret(), 'SQLALCHEMY_DATABASE_URI':f'sqlite:///{DATA / "database.db"}'})
+        port=app.config['QUIZ_PORT']
+        print(f'Quiz server listening on port {port}; 8 Waitress threads',flush=True)
+        serve(app,host='0.0.0.0',port=port,threads=8)
 
-def get_local_ip():
-    try:
-        # Connect to a public DNS to find the correct outgoing IP
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
-    except Exception:
-        return "127.0.0.1"
-
-if __name__ == '__main__':
-    # Get the local IP address
-    host_ip = get_local_ip()
-    port = 5000
-    
-    print(f" \n --- SERVER STARTED ---")
-    print(f" * Local:    http://127.0.0.1:{port}")
-    print(f" * Network:  http://{host_ip}:{port}")
-    print(f" ----------------------\n")
-
-    # host='0.0.0.0' makes it accessible to other devices
-    app.run(debug=True, host='0.0.0.0', port=port)
+if __name__=='__main__': main()
